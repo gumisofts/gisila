@@ -1,0 +1,31 @@
+targets:
+  $default:
+    builders:
+      project_mega:modelFromYamlGen:
+        generate_for:
+          - lib/**
+        enabled: true
+      source_gen:combining_builder:
+        enabled: true
+      project_mega:modelModifier:
+        generate_for:
+          - lib/**
+        enabled: true
+builders:
+  modelModifier:
+    import: "package:project_mega/models/generators/builder.dart" # Update this path to point to the actual file
+    builder_factories: ["modelPartBuilder"]
+    build_extensions: { ".dart": ["models.g.part"] }
+    auto_apply: dependents
+    build_to: cache # Change this to the appropriate output directory
+    applies_builders: ["source_gen:combining_builder"]
+  modelFromYamlGen:
+    runs_before:
+      - project_mega:modelModifier
+      - source_gen:combining_builder
+
+    import: "package:project_mega/models/generators/builder.dart"
+    builder_factories: ["modelFromYamlBuilder"]
+    build_extensions: { ".yaml": [".dart"] }
+    auto_apply: dependents
+    build_to: source
