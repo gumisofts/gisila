@@ -1,0 +1,57 @@
+paths:
+  /users:
+    post:
+      description: Initiate Login or Signup
+      requestBody:
+        content:
+            application/json:
+                schema:
+                    $ref: ../components.yaml#components/schema/User
+      responses:
+        200:
+            description: User is created if does not exist and returns user status
+            content:
+                application/json:
+                    schema:
+                        $ref: ../components.yaml#components/schema/User 
+        400:
+            description: Bad request
+            content:
+                application/json:
+                    schema:
+                        $ref: ../components.yaml#components/schema/BadRequest 
+        403:
+            description: Not Authorized( Api Key is cannot be used to create a resource)
+            content:
+                application/json:
+                    schema:
+                        $ref: ../components.yaml#components/schema/UnAuthorized 
+        
+  /{id}:
+    parameters:
+        - name: id
+          in: path
+          required: true
+          schema: 
+            $ref: ../components.yaml#components/schema/Id
+    get:
+        summary: Get Users by id
+        responses:
+          200:
+            description: Cool
+            content:
+              application/json:
+                schema:
+                  $ref: ../components.yaml#components/schema/User
+          404:
+            description: User Not Found
+            content:
+              application/json:
+                schema:
+                    $ref: ../components.yaml#components/schema/NotFound
+
+
+
+		
+
+

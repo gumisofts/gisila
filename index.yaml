@@ -1,0 +1,84 @@
+openapi: '3.0.0'
+info:
+  version: '0.0.1'
+  title: 'Bita Markets'
+  description: Inventory and Markets
+servers:
+  - url: http://localhost:8000
+  - url: https://bita.gumiapps.com
+paths:
+  /users:
+    $ref: "user/user.yaml#paths/~1users"
+  /users/{id}:
+    $ref: "user/user.yaml#paths/~1{id}"
+  # /users/{id}:
+  #   parameters:
+  #     - name: id
+  #       description: The unique identifier of the user
+  #       in: path
+  #       required: true
+  #       schema:
+  #         $ref: '#/components/schemas/id'
+  #   get:
+  #     summary: Read a User
+  #     responses:
+  #       200:
+  #         description: The user corresponding to the provided `id`
+  #         content:
+  #           application/json:
+  #             schema:
+  #               $ref: './components.yaml#/components/schemas/User'
+  #       404:
+  #         description: No user found for the provided `id`
+  #         content:
+  #           application/json:
+  #             schema:
+  #               $ref: '#/components/schemas/NotFound'
+  #       500:
+  #         description: Unexpected error
+  #         content:
+  #           application/json:
+  #             schema:
+  #               $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    
+    User:
+      type: object
+      required:
+        - id
+        - firstName
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        firstName:
+          type: string
+        lastName:
+          type: string
+        isSuperUser:
+          type: boolean
+        isStaff:
+          type: boolean
+        
+        # type:
+        #   type: string
+        #   enum:
+        #     - capsule
+        #     - probe
+        #     - satellite
+        #     - spaceplane
+        #     - station
+    
+    
+  securitySchemes:
+    ApiKey:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+    Token:
+      type: apiKey
+      in: header
+      name: X-Aauthorization
+security:
+  - ApiKey: []
+  - Token: []
