@@ -3,14 +3,19 @@ info:
   version: '0.0.1'
   title: 'Bita Markets'
   description: Inventory and Markets
+  license: 
+    name: MIT
+    url: https://bita.gumiapps.com/license
+    
 servers:
-  - url: http://localhost:8000
+  - url: http://127.0.0.1:8000
   - url: https://bita.gumiapps.com
 paths:
+  # Paths related to users
   /users:
-    $ref: "user/user.yaml#paths/~1users"
+    $ref: "user/user.yaml#/paths/~1users~1getStartedWithPhone"
   /users/{id}:
-    $ref: "user/user.yaml#paths/~1{id}"
+    $ref: "user/user.yaml#/paths/~1{id}"
   # /users/{id}:
   #   parameters:
   #     - name: id
@@ -41,24 +46,24 @@ paths:
   #             schema:
   #               $ref: '#/components/schemas/Error'
 components:
-  schemas:
+  # schemas:
     
-    User:
-      type: object
-      required:
-        - id
-        - firstName
-      properties:
-        id:
-          $ref: '#/components/schemas/Id'
-        firstName:
-          type: string
-        lastName:
-          type: string
-        isSuperUser:
-          type: boolean
-        isStaff:
-          type: boolean
+  #   User:
+  #     type: object
+  #     required:
+  #       - id
+  #       - firstName
+  #     properties:
+  #       id:
+  #         $ref: '#/components/schemas/Id'
+  #       firstName:
+  #         type: string
+  #       lastName:
+  #         type: string
+  #       isSuperUser:
+  #         type: boolean
+  #       isStaff:
+  #         type: boolean
         
         # type:
         #   type: string
@@ -68,17 +73,11 @@ components:
         #     - satellite
         #     - spaceplane
         #     - station
-    
-    
   securitySchemes:
-    ApiKey:
-      type: apiKey
-      in: header
-      name: X-Api-Key
-    Token:
-      type: apiKey
-      in: header
-      name: X-Aauthorization
+      $ref: components.yaml#/components/securitySchemes
+   
+
 security:
   - ApiKey: []
-  - Token: []
+  - BearerToken: []
+  - basicHttpAuthentication: []

@@ -1,9 +1,8 @@
 components:
   schemas:
     Id:
-      description: resource identifier
-      type: string
-
+      description: Unique resource identifier
+      type: integer
     User:
       type: object
       required:
@@ -13,13 +12,30 @@ components:
         - email
       properties:
         id:
-            type: Id
+          $ref: "#/components/schemas/Id"
+          readOnly: true
         phone:
           type: string
         email:
           type: string
-        owner:
-            type: User
+    UserInfo:
+      required:
+        - user
+        - isRegistrationComplete
+        - accessToken
+        - refreshToken
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        isRegistrationComplete:
+          type: boolean
+        accessToken:
+          type: string
+        refreshToken: 
+          type:
+            string
+
+    # Http Errors
     NotFound:
       type: object
       required:
@@ -51,7 +67,20 @@ components:
         detail:
           description: A human readable error message
           type: string
-    
-        
-        
-        
+  securitySchemes:
+    basicHttpAuthentication:
+      description: Basic HTTP Authentication
+      type: http
+      scheme: Basic
+    BearerToken:
+      description: Bearer token using a JWT
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    ApiKey:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+security:
+  - ApiKey: []
+  - BearerToken: []

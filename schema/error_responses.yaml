@@ -1,0 +1,52 @@
+responses:
+  401:
+    description: it needs authentication to access this resources
+    content:
+      application/json:
+          schema:
+              $ref: ../components.yaml#/components/schemas/UnAuthorized
+    example:
+      application/json:
+        schema:
+          type: object
+          required:
+            - detail
+          properties:
+            detail:
+              type: string
+              example: you need authentication to access this resource
+
+  403:
+    description: you don't have permission to perform this action
+    content:
+      application/json:
+          schema:
+            type: object
+            required:
+              - detail
+            properties:
+              detail:
+                type: string
+          # example:
+          #   schema:
+          #     type: object
+          #     required:
+          #       - detail
+          #     properties:
+          #       detail:
+          #         type: string
+          #         example: you need authentication to access this resource            
+  404:
+    description: The resource could not be found
+  500:
+    description: Oops Un-expected error from our side
+    content:
+      application/json:
+          schema:
+            type: object
+            required:
+              - detail
+            properties:
+              detail:
+                type: string
+

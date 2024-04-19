@@ -1,57 +1,66 @@
 paths:
-  /users:
+  /users/getStartedWithPhone:
     post:
-      description: Initiate Login or Signup
+      security:
+        - ApiKey: []
+      operationId: GetStartedWithPhone
+      summary: Get started With Phone Number
+      description: Initiates Login or Signup with phone
       requestBody:
         content:
             application/json:
                 schema:
-                    $ref: ../components.yaml#components/schema/User
+                    type: object
+                    required: 
+                      - phoneNumber
+                    properties:
+                      phoneNumber:
+                        type: string
       responses:
         200:
             description: User is created if does not exist and returns user status
             content:
                 application/json:
                     schema:
-                        $ref: ../components.yaml#components/schema/User 
+                        $ref: ../components.yaml#/components/schemas/UserInfo 
         400:
             description: Bad request
             content:
                 application/json:
                     schema:
-                        $ref: ../components.yaml#components/schema/BadRequest 
+                        $ref: ../components.yaml#/components/schemas/BadRequest 
         403:
-            description: Not Authorized( Api Key is cannot be used to create a resource)
-            content:
-                application/json:
-                    schema:
-                        $ref: ../components.yaml#components/schema/UnAuthorized 
-        
+          $ref: ../error_responses.yaml#/responses/403
+            
+            
+        500:
+          $ref: ../error_responses.yaml#/responses/500
+
   /{id}:
     parameters:
         - name: id
           in: path
           required: true
           schema: 
-            $ref: ../components.yaml#components/schema/Id
+            $ref: ../components.yaml#/components/schemas/Id
     get:
+        security:
+          - ApiKey: []
+
         summary: Get Users by id
+        operationId: GetUserById
         responses:
           200:
             description: Cool
             content:
               application/json:
                 schema:
-                  $ref: ../components.yaml#components/schema/User
+                  $ref: ../components.yaml#/components/schemas/User
           404:
             description: User Not Found
             content:
               application/json:
                 schema:
-                    $ref: ../components.yaml#components/schema/NotFound
-
-
-
-		
+                    $ref: ../components.yaml#/components/schemas/NotFound
 
 
