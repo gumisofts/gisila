@@ -8,14 +8,14 @@ environment:
 
 dependencies:
   build:
+  d_orm:
+    path: /home/nurad/d-orm
   dart_frog: ^1.0.0
   dart_style: ^2.3.6
-  json_annotation: ^4.8.1
   postgres: ^3.1.2
 
 dev_dependencies:
   build_runner:
-  json_serializable: ^6.7.1
   mocktail: ^1.0.0
   source_gen:
   test: ^1.19.2

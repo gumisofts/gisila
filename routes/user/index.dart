@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:dart_frog/dart_frog.dart';
-import 'package:project_mega/models/models.dart';
-import 'package:project_mega/models/test/schema.dart';
+import 'package:project_mega/models/schema.dart';
 import 'package:project_mega/utils/exceptions/field_exceptions.dart';
 import 'package:project_mega/utils/http.dart';
 import 'package:project_mega/utils/validators/api_validators.dart';
@@ -61,25 +60,29 @@ Future<Response> onRequestPost(RequestContext context) async {
         ),
       ],
     );
-    final user = User.fromJson(data);
-    await User.create(user);
-    return Response.json(body: user);
+    final user = await UserDb.create(
+      firstName: data['firstName'] as String,
+      lastName: data['lastName'] as String?,
+      email: data['email'] as String?,
+      phoneNumber: data['phoneNumber'] as String?,
+    );
+    // TThis is to test
+    return Response.json(body: user!.toJson());
   } on FieldValidationException catch (e) {
     return Response.json(body: e.error, statusCode: statusCode400BadRequest);
   }
 }
 
-Future<Response> onRequestGet(RequestContext context) async {
-  final queryparams = context.request.url.queryParameters;
-  Operation? operation;
+// aa
+Future<Response> onRequestGet(RequestContext contextaa) async {
+  final users =
+      await UserDb.filter(where: (t) => t.firstName.equals("1 or 1=1"));
 
-  for (final entry in queryparams.entries) {
-    if (!UserExt.columns.contains(entry.key)) continue;
-    final op = Operation(entry.key, Operator.eq, entry.value);
-    operation ??= op;
-    operation = operation & op;
-  }
-  final users = await UserExt.filter(operation);
+  // await Future.delayed(const Duration(seconds: 40), () => '');
 
-  return Response.json(body: users.map((e) => e.toJson()).toList());
+  return Response.json(
+    body: users
+        .map((e) => e.toJson(exclude: ['createdAt', 'updatedat']))
+        .toList(),
+  );
 }

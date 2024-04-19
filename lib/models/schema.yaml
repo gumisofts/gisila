@@ -20,10 +20,8 @@ User:
     isStaff:
       type: boolean
       default: false
-      isnull: false
     isSuperUser:
       type: boolean
-      isnull: false
       default: false
     # createdShop:
     #   type: ForeignKey
