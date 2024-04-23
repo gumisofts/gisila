@@ -12,67 +12,47 @@ servers:
   - url: https://bita.gumiapps.com
 paths:
   # Paths related to users
-  /users:
+  /getStartedWithPhone:
     $ref: "user/user.yaml#/paths/~1users~1getStartedWithPhone"
+  /getStartedWithEmail:
+    $ref: "user/user.yaml#/paths/~1users~1getStartedWithEmail"
   /users/{id}:
     $ref: "user/user.yaml#/paths/~1{id}"
-  # /users/{id}:
-  #   parameters:
-  #     - name: id
-  #       description: The unique identifier of the user
-  #       in: path
-  #       required: true
-  #       schema:
-  #         $ref: '#/components/schemas/id'
-  #   get:
-  #     summary: Read a User
-  #     responses:
-  #       200:
-  #         description: The user corresponding to the provided `id`
-  #         content:
-  #           application/json:
-  #             schema:
-  #               $ref: './components.yaml#/components/schemas/User'
-  #       404:
-  #         description: No user found for the provided `id`
-  #         content:
-  #           application/json:
-  #             schema:
-  #               $ref: '#/components/schemas/NotFound'
-  #       500:
-  #         description: Unexpected error
-  #         content:
-  #           application/json:
-  #             schema:
-  #               $ref: '#/components/schemas/Error'
+  # Shopping
+  /shopping/items:
+    $ref: "shopping/product.yaml#/paths/~1items"
+  /shopping/shops/{id}:
+    $ref: "shopping/product.yaml#/paths/~1shops~1{id}"
+  /shopping/shops/popular:
+    $ref: "shopping/product.yaml#/paths/~1shops~1popular"
+  /shopping/catagories:  
+    $ref: "shopping/product.yaml#/paths/~1shops~1catagories"
+  /shopping/brands:
+    $ref: "shopping/product.yaml#/paths/~1shops~1brands"
+    # inventory 
+  /inventory/brands:
+    $ref: "stock/stock.yaml#/paths/~1brands"
+  /inventory/catagories:
+    $ref: "stock/stock.yaml#/paths/~1catagories"
+  /inventory/shops:
+    $ref: "stock/stock.yaml#/paths/~1shops"
+  /inventory/shops/me:
+    $ref: "stock/stock.yaml#/paths/~1shops~1me"
+  /inventory/shops/{id}:
+    $ref: "stock/stock.yaml#/paths/~1shops~1{id}"
+  /inventory/shops/settings/{id}:
+    $ref: "stock/stock.yaml#/paths/~1settings~1{id}"
+  # /inventory/products:
+  #   $ref: "stock/stock.yaml#/paths/~1products"
+  /inventory/products/{id}:
+    $ref: "stock/stock.yaml#/paths/~1products~1{id}"
+
+  
+
+
+
+  
 components:
-  # schemas:
-    
-  #   User:
-  #     type: object
-  #     required:
-  #       - id
-  #       - firstName
-  #     properties:
-  #       id:
-  #         $ref: '#/components/schemas/Id'
-  #       firstName:
-  #         type: string
-  #       lastName:
-  #         type: string
-  #       isSuperUser:
-  #         type: boolean
-  #       isStaff:
-  #         type: boolean
-        
-        # type:
-        #   type: string
-        #   enum:
-        #     - capsule
-        #     - probe
-        #     - satellite
-        #     - spaceplane
-        #     - station
   securitySchemes:
       $ref: components.yaml#/components/securitySchemes
    

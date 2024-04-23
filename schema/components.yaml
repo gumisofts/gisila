@@ -3,27 +3,32 @@ components:
     Id:
       description: Unique resource identifier
       type: integer
+      readOnly: true
     User:
       type: object
       required:
         - id
-        - phone
-        - owner
-        - email
       properties:
         id:
           $ref: "#/components/schemas/Id"
-          readOnly: true
-        phone:
+        firstName:
           type: string
+          example: Murad
+        lastName:
+          type: string
+          example: Hussen
+        phoneNumber:
+          type: string
+          example: "928808587"
         email:
           type: string
+          example: nuradhussen082@gmail.com
+        
     UserInfo:
       required:
         - user
         - isRegistrationComplete
         - accessToken
-        - refreshToken
       properties:
         user:
           $ref: "#/components/schemas/User"
@@ -31,9 +36,43 @@ components:
           type: boolean
         accessToken:
           type: string
-        refreshToken: 
-          type:
-            string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzMwMDQwMjY5LCJpYXQiOjE2OTg1MDQyNjksImp0aSI6IjAyYTFlMTg0MmM1ODQ0YjJhMmJkZmVhM2U5YmNkNGJkIiwidXNlcl9pZCI6Miwic3RyZWFtIjoxfQ.XUcFTellSacjc-M31vuTLWFdHJ2S3Ix4OKdwJnyTXsE
+
+    Product:
+      type: object
+      required:
+        - id
+        - name
+        - shopId
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        name:
+          type: string
+    ProductView:
+      type: object
+      required:
+        - id
+        - name
+        - shopId
+        - price
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        name:
+          type: string
+        shopId:
+          type: integer
+          format: int64
+        price:
+          type: integer
+      example:
+        id: 10
+        name: Samsung S10 Plus
+        price: 20000
+        shopId: 223
+
+        
 
     # Http Errors
     NotFound:

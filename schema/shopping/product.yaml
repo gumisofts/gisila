@@ -1,0 +1,95 @@
+paths:
+  # filters: price, distance
+  /items:
+    get:
+      operationId: getItems
+      summary: Get Items
+      security:
+        - ApiKey: []
+      responses:
+        200:
+          description: Request Successfully completed
+          content:
+            application/json:
+              schema:
+                type: array
+                required:
+                  - product
+                properties:
+                  product:
+                    $ref: "../components.yaml#/components/schemas/ProductView"
+              example:
+                - id: 10
+                  name: Samsung s10 plus
+                  price: 27000
+                  shopId: 12
+
+        403:
+          $ref: "../error_responses.yaml#/responses/403"
+  /shops/{id}:
+    get:
+      parameters:
+        - name: id
+          in: path
+          schema: 
+            $ref: ../components.yaml#/components/schemas/Id
+      operationId: GetShopById
+      summary:  Get shop by id
+      security:
+        - ApiKey: []
+      responses:
+        200:
+          description: Provide Id to get shop
+          content:
+            application/json:
+              schema:
+                type: array
+        403:
+          $ref: "../error_responses.yaml#/responses/403"
+  /shops/popular:
+    get:
+      operationId: GetPopularShop
+      summary:  Get Popular Shops
+      security:
+        - ApiKey: []
+      responses:
+        200:
+          description: Provide Id to get shop
+          content:
+            application/json:
+              schema:
+                type: array
+        403:
+          $ref: "../error_responses.yaml#/responses/403"
+  /shops/catagories:
+    get:
+      operationId: GetCatagories
+      summary:  Get shop Catagories
+      security:
+        - ApiKey: []
+      responses:
+        200:
+          description: Provide Id to get shop
+          content:
+            application/json:
+              schema:
+                type: array
+        403:
+          $ref: "../error_responses.yaml#/responses/403"
+  /shops/brands:
+    get:
+      operationId: GetBrands
+      summary:  Get shop Brands
+      security:
+        - ApiKey: []
+      responses:
+        200:
+          description: Provide Id to get shop
+          content:
+            application/json:
+              schema:
+                type: array
+        403:
+          $ref: "../error_responses.yaml#/responses/403"
+
+

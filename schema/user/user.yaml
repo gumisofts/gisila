@@ -10,12 +10,12 @@ paths:
         content:
             application/json:
                 schema:
-                    type: object
-                    required: 
-                      - phoneNumber
-                    properties:
-                      phoneNumber:
-                        type: string
+                  type: object
+                  properties:
+                    phoneNumber:
+                      type: string
+                      format: phone
+                      example: "928808587"
       responses:
         200:
             description: User is created if does not exist and returns user status
@@ -28,11 +28,48 @@ paths:
             content:
                 application/json:
                     schema:
-                        $ref: ../components.yaml#/components/schemas/BadRequest 
+                       type: object
+                       required:
+                        - phoneNumber
+                       properties:
+                        phoneNumber:
+                          type: string
+                    example:
+                      phoneNumber: Invalid phoneNumber
+
         403:
           $ref: ../error_responses.yaml#/responses/403
-            
-            
+        500:
+          $ref: ../error_responses.yaml#/responses/500
+  /users/getStartedWithEmail:
+    post:
+      security:
+        $ref: '#/paths/~1users~1getStartedWithPhone/post/security'
+      operationId: GetStartedWithEmail
+      summary: Get started With Email
+      description: Initiates Login or Signup with Email
+      requestBody:
+        content:
+            application/json:
+                schema:
+                    type: object
+                    required: 
+                      - email
+                    properties:
+                      email:
+                        type: string
+                        example: nuradhussen082@gmail.com
+      responses:
+        200:
+          $ref: '#/paths/~1users~1getStartedWithPhone/post/responses/200'
+
+        400:
+          
+          $ref: '#/paths/~1users~1getStartedWithPhone/post/responses/400'
+           
+        403:
+          $ref: ../error_responses.yaml#/responses/403
+
         500:
           $ref: ../error_responses.yaml#/responses/500
 

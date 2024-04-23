@@ -1,0 +1,125 @@
+paths:
+  /brands:
+    get:
+      operationId: InventoryGetBrands
+      description: Get available Brands
+      summary: Get available Brands
+      responses:
+        200:
+          description: responses is completed Successfully
+          content:
+            application/json:
+              schema:
+                type: object
+        403:
+          $ref: "../error_responses.yaml#/responses/403"
+  /catagories:
+    get:
+      operationId: InventoryGetCatagory
+      description: Get available Catagories
+      summary: Get available Brands
+      responses:
+        200:
+          description: responses is completed Successfully
+          content:
+            application/json:
+              schema:
+                type: object
+        403:
+          $ref: "../error_responses.yaml#/responses/403"
+  /shops:
+    get:
+      # parameters:
+      #   - name: id
+      #     required: false
+      #     schema:
+      #       $ref: "../components.yaml#/components/schemas/Id"
+      operationId: GetShopsInventory
+      description: Get shops for inventory
+      summary: Get shops for inventory
+      responses:
+        200:
+          description: Some description
+          content:
+            application/json:
+              schema:
+                type: object
+        403:
+          $ref: "../error_responses.yaml#/responses/403" 
+          
+  /shops/{id}:
+    get:
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            $ref: "../components.yaml#/components/schemas/Id"
+      operationId: GetShopsByIdInventory
+      description: Get shops for inventory
+      summary: Get shops for inventory
+      responses:
+        200:
+          description: Request completed Successfully
+          content:
+            application/json:
+              schema:
+                type: object
+        403:
+          $ref: "../error_responses.yaml#/responses/403" 
+          
+  /shops/me:
+    get:
+      operationId: GetMyShops
+      description: Get shops for current user
+      summary:  Get shops for current user
+      responses:
+        200:
+          description: Some description
+          content:
+            application/json:
+              schema:
+                type: object
+        403:
+          $ref: "../error_responses.yaml#/responses/403" 
+  /products/{id}:
+    get:
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            $ref: "../components.yaml#/components/schemas/Id"
+      operationId: GetShopProducts
+      description: Get products by for provided shop Id
+      summary: Get Shops Product
+      responses:
+        200:
+          description: Some description
+          content:
+            application/json:
+              schema:
+                type: object
+        403:
+          $ref: "../error_responses.yaml#/responses/403" 
+  /settings/{id}:
+    get:
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            $ref: "../components.yaml#/components/schemas/Id"
+      operationId: GetShopPreference
+      description: Get shops Preference(Settings)
+      summary: Get shops Preference(Settings)
+      responses:
+        200:
+          description: Request completed Successfully
+          content:
+            application/json:
+              schema:
+                type: object
+        403:
+          $ref: "../error_responses.yaml#/responses/403" 
+          

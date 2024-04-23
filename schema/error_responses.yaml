@@ -27,17 +27,18 @@ responses:
             properties:
               detail:
                 type: string
-          # example:
-          #   schema:
-          #     type: object
-          #     required:
-          #       - detail
-          #     properties:
-          #       detail:
-          #         type: string
-          #         example: you need authentication to access this resource            
+                example: you don't have enough permission
   404:
     description: The resource could not be found
+    content:
+      schema:
+        type: object
+        required:
+          - detail
+        properties:
+          detail:
+            type: string
+            example: The resource you are looking for could not be found
   500:
     description: Oops Un-expected error from our side
     content:
