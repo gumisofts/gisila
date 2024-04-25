@@ -50,4 +50,5 @@ responses:
             properties:
               detail:
                 type: string
+                example: Oops we are having trouble to completing your request
 

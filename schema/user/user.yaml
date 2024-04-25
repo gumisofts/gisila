@@ -17,12 +17,20 @@ paths:
                       format: phone
                       example: "928808587"
       responses:
-        200:
+        200:  
             description: User is created if does not exist and returns user status
             content:
                 application/json:
                     schema:
-                        $ref: ../components.yaml#/components/schemas/UserInfo 
+                        type: object
+                        required:
+                          - user
+                          - isRegistrationComplete
+                        properties:
+                          user:
+                            $ref: ../components.yaml#/components/schemas/User 
+                          isRegistrationComplete:
+                            type: boolean
         400:
             description: Bad request
             content:
@@ -72,6 +80,65 @@ paths:
 
         500:
           $ref: ../error_responses.yaml#/responses/500
+  /users/verifyOtp:
+    post:
+
+      security:
+        $ref: '#/paths/~1users~1getStartedWithPhone/post/security'
+      operationId: VerifyOtp
+      summary: Verify Email or Phone
+      description: Verifies OTP and returns access 
+
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - otp
+                - otpType
+                - userId
+              properties:
+                otp: 
+                  description: six digit number sent to user's email or phone ; used as temporary password or verification
+                  type: integer
+                  example: 123456
+                otpType:
+                  type: string
+                  enum: ['email','phone']
+                  example: email
+                userId:
+                  type: integer
+                  format: int64
+                  example: 10
+
+      responses:
+        200:
+            description: OTP is Verified succesfully
+            content:
+                application/json:
+                    schema:
+                        $ref: ../components.yaml#/components/schemas/UserInfo 
+        400:
+            description: Bad request
+            content:
+                application/json:
+                    schema:
+                       type: object
+                       required:
+                        - otp
+                       properties:
+                        otp:
+                          type: string
+                    example:
+                      otp: this field is required
+
+        403:
+          $ref: ../error_responses.yaml#/responses/403
+        500:
+          $ref: ../error_responses.yaml#/responses/500
+
+  
 
   /{id}:
     parameters:

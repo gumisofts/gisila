@@ -12,10 +12,13 @@ servers:
   - url: https://bita.gumiapps.com
 paths:
   # Paths related to users
-  /getStartedWithPhone:
+  /users/account/getStartedWithPhone:
     $ref: "user/user.yaml#/paths/~1users~1getStartedWithPhone"
-  /getStartedWithEmail:
+  /users/account/getStartedWithEmail:
     $ref: "user/user.yaml#/paths/~1users~1getStartedWithEmail"
+  /users/account/verifyOtp:
+    $ref: "user/user.yaml#/paths/~1users~1verifyOtp"
+
   /users/{id}:
     $ref: "user/user.yaml#/paths/~1{id}"
   # Shopping
