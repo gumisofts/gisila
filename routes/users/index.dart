@@ -1,10 +1,10 @@
 import 'dart:async';
+
 import 'package:dart_frog/dart_frog.dart';
 import 'package:project_mega/models/models.dart';
-import 'package:project_mega/models/test/schema.dart';
 import 'package:project_mega/utils/exceptions/field_exceptions.dart';
+import 'package:project_mega/utils/forms/api_validators.dart';
 import 'package:project_mega/utils/http.dart';
-import 'package:project_mega/utils/validators/api_validators.dart';
 
 Future<Response> onRequest(RequestContext context) async {
   if (context.request.method == HttpMethod.post) {
@@ -18,7 +18,7 @@ Future<Response> onRequest(RequestContext context) async {
 
 Future<Response> onRequestPost(RequestContext context) async {
   try {
-    final data = await fieldValidatorWrapper(
+    final data = await form(
       context,
       fields: [
         FieldValidator<String>(
@@ -61,8 +61,8 @@ Future<Response> onRequestPost(RequestContext context) async {
         ),
       ],
     );
-    final user = User.fromJson(data);
-    await User.create(user);
+    // final user = User.fromJson(data);
+    final user = await UserDb.create();
     return Response.json(body: user);
   } on FieldValidationException catch (e) {
     return Response.json(body: e.error, statusCode: statusCode400BadRequest);
@@ -71,15 +71,15 @@ Future<Response> onRequestPost(RequestContext context) async {
 
 Future<Response> onRequestGet(RequestContext context) async {
   final queryparams = context.request.url.queryParameters;
-  Operation? operation;
+  // Operation? operation;
 
-  for (final entry in queryparams.entries) {
-    if (!UserExt.columns.contains(entry.key)) continue;
-    final op = Operation(entry.key, Operator.eq, entry.value);
-    operation ??= op;
-    operation = operation & op;
-  }
-  final users = await UserExt.filter(operation);
+  // for (final entry in queryparams.entries) {
+  //   if (!UserExt.columns.contains(entry.key)) continue;
+  //   final op = Operation(entry.key, Operator.eq, entry.value);
+  //   operation ??= op;
+  //   operation = operation & op;
+  // }
+  // final users = await UserExt.filter(operation);
 
-  return Response.json(body: users.map((e) => e.toJson()).toList());
+  return Response.json();
 }

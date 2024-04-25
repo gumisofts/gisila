@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:dart_frog/dart_frog.dart';
 import 'package:project_mega/middlewares/common_middlewares.dart';
-import 'package:project_mega/utils/exceptions/field_exceptions.dart';
+import 'package:project_mega/utils/utils.dart';
 
 class Field<T> {
   Field({required this.name, required this.content});
@@ -66,7 +66,7 @@ final nameFieldValidator = FieldValidator<String>(
     return null;
   },
 );
-Future<Map<String, dynamic>> fieldValidatorWrapper(
+Future<Map<String, dynamic>> form(
   RequestContext context, {
   required List<FieldValidator<dynamic>> fields,
 }) async {
@@ -141,3 +141,21 @@ Future<Map<String, dynamic>> fieldValidatorWrapper(
 
   return {};
 }
+
+// class Permission {
+//   Permission({required this.hasPerm});
+//   // Function next;
+//   void Function(RequestContext context, dynamic obj) hasPerm;
+// }
+
+// final userEndpointPermission = Permission(
+//   hasPerm: (context, obj) {
+//     final user = context.read<User?>();
+//     if (!user.isAuthenticated) {
+//       throw unAuthorizedException;
+//     }
+//     if (user!.id != obj.id) {
+//       throw forbidenException;
+//     }
+//   },
+// );

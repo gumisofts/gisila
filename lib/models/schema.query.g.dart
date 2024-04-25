@@ -1,5 +1,19 @@
 part of 'schema.dart';
 
+class FileTbQuery {
+  FileTbQuery();
+  factory FileTbQuery.referenced({required List<Join> joins}) =>
+      FileTbQuery().._joins.addAll(joins);
+  static const table = 'filetb';
+  NumberColumn get id => NumberColumn(column: 'filetbId', offtable: 'filetb');
+  TextColumn get url =>
+      TextColumn(column: 'url', offtable: 'filetb', depends: _joins);
+  TextColumn get isAbsolute =>
+      TextColumn(column: 'isAbsolute', offtable: 'filetb', depends: _joins);
+  final _joins = <Join>[];
+  static List<String> get columns => <String>['filetbId', 'url', 'isAbsolute'];
+}
+
 class UserQuery {
   UserQuery();
   factory UserQuery.referenced({required List<Join> joins}) =>
@@ -18,10 +32,6 @@ class UserQuery {
       TextColumn(column: 'createdAt', offtable: 'user', depends: _joins);
   TextColumn get updatedAt =>
       TextColumn(column: 'updatedAt', offtable: 'user', depends: _joins);
-  TextColumn get isStaff =>
-      TextColumn(column: 'isStaff', offtable: 'user', depends: _joins);
-  TextColumn get isSuperUser =>
-      TextColumn(column: 'isSuperUser', offtable: 'user', depends: _joins);
   final _joins = <Join>[];
   static List<String> get columns => <String>[
         'userId',
@@ -31,28 +41,48 @@ class UserQuery {
         'email',
         'createdAt',
         'updatedAt',
-        'isStaff',
-        'isSuperUser'
       ];
+}
+
+class PasswordQuery {
+  PasswordQuery();
+  factory PasswordQuery.referenced({required List<Join> joins}) =>
+      PasswordQuery().._joins.addAll(joins);
+  static const table = 'password';
+  NumberColumn get id =>
+      NumberColumn(column: 'passwordId', offtable: 'password');
+  TextColumn get password =>
+      TextColumn(column: 'password', offtable: 'password', depends: _joins);
+  TextColumn get emailOtp =>
+      TextColumn(column: 'emailOtp', offtable: 'password', depends: _joins);
+  TextColumn get phoneOtp =>
+      TextColumn(column: 'phoneOtp', offtable: 'password', depends: _joins);
+  UserQuery get user => UserQuery.referenced(joins: [
+        ..._joins,
+        Join(table: 'user', onn: 'user', from: table),
+      ],);
+  final _joins = <Join>[];
+  static List<String> get columns =>
+      <String>['passwordId', 'password', 'emailOtp', 'phoneOtp', 'user'];
 }
 
 class UserInterestAndInteractionQuery {
   UserInterestAndInteractionQuery();
   factory UserInterestAndInteractionQuery.referenced(
-          {required List<Join> joins}) =>
+          {required List<Join> joins,}) =>
       UserInterestAndInteractionQuery().._joins.addAll(joins);
   static const table = 'userinterestandinteraction';
   NumberColumn get id => NumberColumn(
       column: 'userinterestandinteractionId',
-      offtable: 'userinterestandinteraction');
+      offtable: 'userinterestandinteraction',);
   CatagoryQuery get catagory => CatagoryQuery.referenced(joins: [
         ..._joins,
         Join(table: 'catagory', onn: 'catagory', from: table),
-      ]);
+      ],);
   UserQuery get user => UserQuery.referenced(joins: [
         ..._joins,
         Join(table: 'user', onn: 'user', from: table),
-      ]);
+      ],);
   final _joins = <Join>[];
   static List<String> get columns =>
       <String>['userinterestandinteractionId', 'catagory', 'user'];
@@ -84,7 +114,7 @@ class BrandQuery {
   CatagoryQuery get catagory => CatagoryQuery.referenced(joins: [
         ..._joins,
         Join(table: 'catagory', onn: 'catagory', from: table),
-      ]);
+      ],);
   TextColumn get desc =>
       TextColumn(column: 'desc', offtable: 'brand', depends: _joins);
   final _joins = <Join>[];
@@ -124,7 +154,7 @@ class AddressQuery {
         'locality',
         'admin1',
         'admin2',
-        'country'
+        'country',
       ];
 }
 
@@ -139,15 +169,15 @@ class ShopQuery {
   UserQuery get owner => UserQuery.referenced(joins: [
         ..._joins,
         Join(table: 'user', onn: 'owner', from: table),
-      ]);
+      ],);
   AddressQuery get address => AddressQuery.referenced(joins: [
         ..._joins,
         Join(table: 'address', onn: 'address', from: table),
-      ]);
+      ],);
   CatagoryQuery get catagory => CatagoryQuery.referenced(joins: [
         ..._joins,
         Join(table: 'catagory', onn: 'catagory', from: table),
-      ]);
+      ],);
   TextColumn get logo =>
       TextColumn(column: 'logo', offtable: 'shop', depends: _joins);
   TextColumn get bgImage =>
@@ -163,7 +193,34 @@ class ShopQuery {
         'catagory',
         'logo',
         'bgImage',
-        'createdAt'
+        'createdAt',
+      ];
+}
+
+class ShopPrefrencesQuery {
+  ShopPrefrencesQuery();
+  factory ShopPrefrencesQuery.referenced({required List<Join> joins}) =>
+      ShopPrefrencesQuery().._joins.addAll(joins);
+  static const table = 'shopprefrences';
+  NumberColumn get id =>
+      NumberColumn(column: 'shopprefrencesId', offtable: 'shopprefrences');
+  ShopQuery get shop => ShopQuery.referenced(joins: [
+        ..._joins,
+        Join(table: 'shop', onn: 'shop', from: table),
+      ],);
+  TextColumn get isAvailableOnline => TextColumn(
+      column: 'isAvailableOnline', offtable: 'shopprefrences', depends: _joins,);
+  TextColumn get notifyNewProduct => TextColumn(
+      column: 'notifyNewProduct', offtable: 'shopprefrences', depends: _joins,);
+  TextColumn get receiveOrder => TextColumn(
+      column: 'receiveOrder', offtable: 'shopprefrences', depends: _joins,);
+  final _joins = <Join>[];
+  static List<String> get columns => <String>[
+        'shopprefrencesId',
+        'shop',
+        'isAvailableOnline',
+        'notifyNewProduct',
+        'receiveOrder',
       ];
 }
 
@@ -177,7 +234,7 @@ class ShopAcitiviyQuery {
   UserQuery get user => UserQuery.referenced(joins: [
         ..._joins,
         Join(table: 'user', onn: 'user', from: table),
-      ]);
+      ],);
   TextColumn get action =>
       TextColumn(column: 'action', offtable: 'shopacitiviy', depends: _joins);
   final _joins = <Join>[];
@@ -195,11 +252,11 @@ class ShopReviewQuery {
   UserQuery get user => UserQuery.referenced(joins: [
         ..._joins,
         Join(table: 'user', onn: 'user', from: table),
-      ]);
+      ],);
   ShopQuery get shop => ShopQuery.referenced(joins: [
         ..._joins,
         Join(table: 'shop', onn: 'shop', from: table),
-      ]);
+      ],);
   final _joins = <Join>[];
   static List<String> get columns => <String>['shopreviewId', 'user', 'shop'];
 }
@@ -215,7 +272,7 @@ class ProductQuery {
   NumberColumn get buyingPrice =>
       NumberColumn(column: 'buyingPrice', offtable: 'product', depends: _joins);
   NumberColumn get sellingPrice => NumberColumn(
-      column: 'sellingPrice', offtable: 'product', depends: _joins);
+      column: 'sellingPrice', offtable: 'product', depends: _joins,);
   NumberColumn get quantity =>
       NumberColumn(column: 'quantity', offtable: 'product', depends: _joins);
   TextColumn get desc =>
@@ -227,7 +284,7 @@ class ProductQuery {
         'buyingPrice',
         'sellingPrice',
         'quantity',
-        'desc'
+        'desc',
       ];
 }
 
@@ -240,7 +297,7 @@ class LikeQuery {
   ProductQuery get product => ProductQuery.referenced(joins: [
         ..._joins,
         Join(table: 'product', onn: 'product', from: table),
-      ]);
+      ],);
   final _joins = <Join>[];
   static List<String> get columns => <String>['likeId', 'product'];
 }
@@ -254,11 +311,11 @@ class FollowQuery {
   ShopQuery get shop => ShopQuery.referenced(joins: [
         ..._joins,
         Join(table: 'shop', onn: 'shop', from: table),
-      ]);
+      ],);
   UserQuery get user => UserQuery.referenced(joins: [
         ..._joins,
         Join(table: 'user', onn: 'user', from: table),
-      ]);
+      ],);
   final _joins = <Join>[];
   static List<String> get columns => <String>['followId', 'shop', 'user'];
 }
@@ -278,11 +335,11 @@ class OrderQuery {
   ShopQuery get shop => ShopQuery.referenced(joins: [
         ..._joins,
         Join(table: 'shop', onn: 'shop', from: table),
-      ]);
+      ],);
   UserQuery get user => UserQuery.referenced(joins: [
         ..._joins,
         Join(table: 'user', onn: 'user', from: table),
-      ]);
+      ],);
   final _joins = <Join>[];
   static List<String> get columns =>
       <String>['orderId', 'status', 'type', 'msg', 'shop', 'user'];
@@ -297,13 +354,13 @@ class ItemsQuery {
   ProductQuery get product => ProductQuery.referenced(joins: [
         ..._joins,
         Join(table: 'product', onn: 'product', from: table),
-      ]);
+      ],);
   NumberColumn get quantity =>
       NumberColumn(column: 'quantity', offtable: 'items', depends: _joins);
   OrderQuery get order => OrderQuery.referenced(joins: [
         ..._joins,
         Join(table: 'order', onn: 'order', from: table),
-      ]);
+      ],);
   TextColumn get createdAt =>
       TextColumn(column: 'createdAt', offtable: 'items', depends: _joins);
   final _joins = <Join>[];
@@ -321,9 +378,9 @@ class NotificationQuery {
   UserQuery get user => UserQuery.referenced(joins: [
         ..._joins,
         Join(table: 'user', onn: 'user', from: table),
-      ]);
+      ],);
   TextColumn get timestamp => TextColumn(
-      column: 'timestamp', offtable: 'notification', depends: _joins);
+      column: 'timestamp', offtable: 'notification', depends: _joins,);
   TextColumn get title =>
       TextColumn(column: 'title', offtable: 'notification', depends: _joins);
   TextColumn get content =>
@@ -337,7 +394,7 @@ class NotificationQuery {
         'timestamp',
         'title',
         'content',
-        'type'
+        'type',
       ];
 }
 
@@ -348,24 +405,24 @@ class GiftCardQuery {
   static const table = 'giftcard';
   NumberColumn get id =>
       NumberColumn(column: 'giftcardId', offtable: 'giftcard');
-  TextColumn get coupon_id =>
-      TextColumn(column: 'coupon_id', offtable: 'giftcard', depends: _joins);
+  TextColumn get couponId =>
+      TextColumn(column: 'couponId', offtable: 'giftcard', depends: _joins);
   UserQuery get owner => UserQuery.referenced(joins: [
         ..._joins,
         Join(table: 'user', onn: 'owner', from: table),
-      ]);
+      ],);
   UserQuery get createdBy => UserQuery.referenced(joins: [
         ..._joins,
         Join(table: 'user', onn: 'createdBy', from: table),
-      ]);
+      ],);
   ProductQuery get product => ProductQuery.referenced(joins: [
         ..._joins,
         Join(table: 'product', onn: 'product', from: table),
-      ]);
+      ],);
   ShopQuery get shop => ShopQuery.referenced(joins: [
         ..._joins,
         Join(table: 'shop', onn: 'shop', from: table),
-      ]);
+      ],);
   TextColumn get redeemed =>
       TextColumn(column: 'redeemed', offtable: 'giftcard', depends: _joins);
   TextColumn get expireDate =>
@@ -373,13 +430,13 @@ class GiftCardQuery {
   final _joins = <Join>[];
   static List<String> get columns => <String>[
         'giftcardId',
-        'coupon_id',
+        'couponId',
         'owner',
         'createdBy',
         'product',
         'shop',
         'redeemed',
-        'expireDate'
+        'expireDate',
       ];
 }
 
@@ -392,15 +449,15 @@ class BlockedQuery {
   UserQuery get user => UserQuery.referenced(joins: [
         ..._joins,
         Join(table: 'user', onn: 'user', from: table),
-      ]);
+      ],);
   ShopQuery get shop => ShopQuery.referenced(joins: [
         ..._joins,
         Join(table: 'shop', onn: 'shop', from: table),
-      ]);
+      ],);
   ProductQuery get product => ProductQuery.referenced(joins: [
         ..._joins,
         Join(table: 'product', onn: 'product', from: table),
-      ]);
+      ],);
   TextColumn get endDate =>
       TextColumn(column: 'endDate', offtable: 'blocked', depends: _joins);
   final _joins = <Join>[];
@@ -434,23 +491,23 @@ class ReportQuery {
   PolicyQuery get policy => PolicyQuery.referenced(joins: [
         ..._joins,
         Join(table: 'policy', onn: 'policy', from: table),
-      ]);
+      ],);
   ShopQuery get shop => ShopQuery.referenced(joins: [
         ..._joins,
         Join(table: 'shop', onn: 'shop', from: table),
-      ]);
+      ],);
   UserQuery get user => UserQuery.referenced(joins: [
         ..._joins,
         Join(table: 'user', onn: 'user', from: table),
-      ]);
+      ],);
   UserQuery get violator => UserQuery.referenced(joins: [
         ..._joins,
         Join(table: 'user', onn: 'violator', from: table),
-      ]);
+      ],);
   ProductQuery get product => ProductQuery.referenced(joins: [
         ..._joins,
         Join(table: 'product', onn: 'product', from: table),
-      ]);
+      ],);
   TextColumn get desc =>
       TextColumn(column: 'desc', offtable: 'report', depends: _joins);
   final _joins = <Join>[];
@@ -461,6 +518,6 @@ class ReportQuery {
         'user',
         'violator',
         'product',
-        'desc'
+        'desc',
       ];
 }

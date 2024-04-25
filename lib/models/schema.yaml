@@ -1,9 +1,15 @@
+FileTb:
+  columns:
+    url:
+      type: Text
+      isnull: false
+    isAbsolute:
+      type: boolean
+      default: false
 # Related To User Management
 User:
   columns:
-    firstName:
-      type: Text
-      isnull: false
+    firstName: Text
     lastName: Text
     phoneNumber:
       type: Text
@@ -17,17 +23,15 @@ User:
     updatedAt:
       type: timestamp
       default: DateTime.now()
-    isStaff:
-      type: boolean
-      default: false
+Password:
+  columns:
+    password: Text
+    emailOtp: Text
+    phoneOtp: Text
+    user:
+      type: ForeignKey
+      references: User
       isnull: false
-    isSuperUser:
-      type: boolean
-      isnull: false
-      default: false
-    # createdShop:
-    #   type: ForeignKey
-    #   references: Shop
 UserInterestAndInteraction:
   columns:
     catagory:
@@ -93,10 +97,24 @@ Shop:
     createdAt:
       type: timestamp
       default: DateTime.now()
-      isnull: false
 
   unique_together:
     -
+ShopPrefrences:
+  columns:
+    shop:
+      type: ForeignKey
+      references: Shop
+      unique: true
+    isAvailableOnline: 
+      type: boolean
+      default: true
+    notifyNewProduct: 
+      type: boolean
+      default: false
+    receiveOrder:
+      type: boolean
+      default: false
 ShopAcitiviy:
   columns:
     user:
@@ -199,7 +217,7 @@ Notification:
       isnull: false
 GiftCard:
   columns:
-    coupon_id:
+    couponId:
       type: Text
       isnull: false
     owner:
