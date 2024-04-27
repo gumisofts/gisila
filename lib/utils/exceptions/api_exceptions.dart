@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:dart_frog/dart_frog.dart';
 import 'package:project_mega/utils/utils.dart';
 
@@ -29,6 +30,8 @@ Future<Response> safeClosure(
     return await endpoint();
   } on EndPointException catch (e) {
     return Response.json(statusCode: e.code, body: e.error);
+  } on FieldValidationException catch (e) {
+    return Response.json(statusCode: HttpStatus.badRequest, body: e.error);
   } catch (e) {
     return Response.json(body: {'detail': e.toString()});
   }

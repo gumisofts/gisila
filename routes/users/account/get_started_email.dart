@@ -1,9 +1,6 @@
 import 'package:dart_frog/dart_frog.dart';
 import 'package:project_mega/models/models.dart';
-import 'package:project_mega/utils/exceptions/field_exceptions.dart';
-import 'package:project_mega/utils/forms/api_validators.dart';
-import 'package:project_mega/utils/http.dart';
-import 'package:project_mega/utils/jwt.dart';
+import 'package:project_mega/utils/utils.dart';
 
 Future<Response> onRequest(RequestContext context) async {
   if (context.request.method == HttpMethod.post) {
@@ -33,12 +30,20 @@ Future<Response> onRequestPost(RequestContext context) async {
 
     user = await UserDb.get(where: (t) => t.email.equals(email));
     user ??= await UserDb.create(email: email);
-    final access = JWTAuth.authenticate(user);
+    var pass = await PasswordDb.get(where: (t) => t.userId.equals(user!.id!));
+
+    pass ??= await PasswordDb.create(userId: user!.id!);
+
+    final otp = generateSecureRandom();
+    pass!.emailOtp = otp.toString();
+
+    await pass.save();
+
+    await SendMail.sendOtp(otp.toString(), user!);
     return Response.json(
       body: {
-        'user': user?.toJson(),
-        'isRegistrationComplete': user?.firstName != null,
-        'accessToken': access,
+        'user': user.toJson(),
+        'isRegistrationComplete': user.firstName != null,
       },
     );
   } on FieldValidationException catch (e) {

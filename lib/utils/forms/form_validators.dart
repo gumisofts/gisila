@@ -88,12 +88,18 @@ Future<Map<String, dynamic>> form(
         if (data[field.name] == null) {
           continue;
         }
-        final validated = field.validate(data[field.name]);
-        if (validated != null) {
-          err[field.name] = validated;
-        }
-        if (data[field.name] != null) {
-          validatedData[field.name] = data[field.name];
+        try {
+          final validated = field.validate(data[field.name]);
+
+          if (validated != null) {
+            err[field.name] = validated;
+          }
+          if (data[field.name] != null) {
+            validatedData[field.name] = data[field.name];
+          }
+        } catch (e) {
+          err[field.name] = e.toString();
+          continue;
         }
       }
 
@@ -121,12 +127,17 @@ Future<Map<String, dynamic>> form(
       if (data[field.name] == null) {
         continue;
       }
-      final validated = field.validate(data[field.name]);
-      if (validated != null) {
-        err[field.name] = validated;
-      }
-      if (data[field.name] != null) {
-        validatedData[field.name] = data[field.name];
+      try {
+        final validated = field.validate(data[field.name]);
+        if (validated != null) {
+          err[field.name] = validated;
+        }
+        if (data[field.name] != null) {
+          validatedData[field.name] = data[field.name];
+        }
+      } catch (e) {
+        err[field.name] = e.toString();
+        continue;
       }
     }
 
@@ -141,21 +152,3 @@ Future<Map<String, dynamic>> form(
 
   return {};
 }
-
-// class Permission {
-//   Permission({required this.hasPerm});
-//   // Function next;
-//   void Function(RequestContext context, dynamic obj) hasPerm;
-// }
-
-// final userEndpointPermission = Permission(
-//   hasPerm: (context, obj) {
-//     final user = context.read<User?>();
-//     if (!user.isAuthenticated) {
-//       throw unAuthorizedException;
-//     }
-//     if (user!.id != obj.id) {
-//       throw forbidenException;
-//     }
-//   },
-// );
