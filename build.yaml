@@ -1,0 +1,31 @@
+targets:
+  $default:
+    builders:
+      d_orm:modelFromYamlGen:
+        generate_for:
+          - lib/models/schema.yaml
+        enabled: true
+      source_gen:combining_builder:
+        enabled: true
+      d_orm:modelModifier:
+        generate_for:
+          - lib/**
+        enabled: true
+builders:
+  modelModifier:
+    import: "package:d_orm/generators/builder.dart" # Update this path to point to the actual file
+    builder_factories: ["modelPartBuilder"]
+    build_extensions: { ".dart": ["models.g.part"] }
+    auto_apply: dependents
+    build_to: cache # Change this to the appropriate output directory
+    applies_builders: ["source_gen:combining_builder"]
+  modelFromYamlGen:
+    runs_before:
+      - d_orm:modelModifier
+      - source_gen:combining_builder
+
+    import: "package:d_orm/generators/builder.dart"
+    builder_factories: ["modelFromYamlBuilder"]
+    build_extensions: { ".yaml": [".dart"] }
+    auto_apply: dependents
+    build_to: source

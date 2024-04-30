@@ -1,0 +1,261 @@
+# Related To User Management
+User:
+  columns:
+    firstName:
+      type: Text
+      isnull: false
+    lastName: Text
+    phoneNumber:
+      type: Text
+      unique: true
+    email:
+      type: Text
+      unique: true
+    createdAt:
+      type: timestamp
+      default: DateTime.now()
+    updatedAt:
+      type: timestamp
+      default: DateTime.now()
+    isStaff:
+      type: boolean
+      default: false
+    isSuperUser:
+      type: boolean
+      default: false
+    # createdShop:
+    #   type: ForeignKey
+    #   references: Shop
+UserInterestAndInteraction:
+  columns:
+    catagory:
+      type: ForeignKey
+      references: Catagory
+      isnull: false
+    user:
+      type: ForeignKey
+      references: User
+      isnull: false
+
+# Basic informations and Supporters
+Catagory:
+  columns:
+    name:
+      type: Text
+      isnull: false
+      unique: true
+    desc: Text
+Brand:
+  columns:
+    name:
+      type: Text
+      isnull: false
+      unique: true
+    catagory:
+      type: ForeignKey
+      references: Catagory
+    desc: Text
+Address:
+  columns:
+    lat: Real
+    lng: Real
+    plusCode: Text
+    sublocality: Text
+    locality: Text
+    admin1: Text
+    admin2: Text
+    country: Text
+# Specific To shops
+Shop:
+  columns:
+    name:
+      type: Text
+      isnull: false
+    owner:
+      type: ForeignKey
+      references: User
+      isnull: false
+      # Choices are SETNULL,CASCADE,SETDEFAULT,PROTECT
+      onDelete: CASCADE
+      reverseName: shops
+    address:
+      type: ForeignKey
+      references: Address
+      isnull: false
+      unique: true
+    catagory:
+      type: ForeignKey
+      references: Catagory
+    logo: Text
+    bgImage: Text
+    createdAt:
+      type: timestamp
+      default: DateTime.now()
+
+  unique_together:
+    -
+ShopAcitiviy:
+  columns:
+    user:
+      type: ForeignKey
+      references: User
+      isnull: false
+    action: Text
+ShopReview:
+  columns:
+    user:
+      type: ForeignKey
+      references: User
+      isnull: false
+    shop:
+      type: ForeignKey
+      references: Shop
+      isnull: false
+
+Product:
+  columns:
+    name:
+      type: Text
+      isnull: false
+    buyingPrice:
+      type: Real
+      isnull: false
+    sellingPrice:
+      type: Real
+      isnull: false
+    quantity:
+      type: integer
+      isnull: false
+      default: 0
+    desc: Text
+
+Like:
+  columns:
+    product:
+      type: ForeignKey
+      isnull: false
+      references: Product
+Follow:
+  columns:
+    shop:
+      type: ForeignKey
+      isnull: false
+      references: Shop
+    user:
+      type: ForeignKey
+      isnull: false
+      references: User
+
+Order:
+  columns:
+    status: Text
+    type: Text
+    msg: Text
+    shop:
+      type: ForeignKey
+      references: Shop
+      isnull: false
+    user:
+      type: ForeignKey
+      references: User
+      isnull: false
+Items:
+  columns:
+    product:
+      type: ForeignKey
+      references: Product
+      isnull: false
+    quantity:
+      type: integer
+      isnull: false
+      default: 0
+    order:
+      type: ForeignKey
+      references: Order
+    createdAt:
+      type: timestamp
+      default: DateTime.now()
+
+Notification:
+  columns:
+    user:
+      type: ForeignKey
+      references: User
+      isnull: false
+    timestamp:
+      type: timestamp
+      isnull: false
+    title:
+      type: Text
+      isnull: false
+    content:
+      type: Text
+      isnull: false
+    type:
+      type: Text
+      isnull: false
+GiftCard:
+  columns:
+    coupon_id:
+      type: Text
+      isnull: false
+    owner:
+      type: ForeignKey
+      references: User
+      isnull: false
+    createdBy:
+      type: ForeignKey
+      references: User
+    product:
+      type: ForeignKey
+      references: Product
+    shop:
+      type: ForeignKey
+      references: Shop
+    redeemed:
+      type: boolean
+      default: false
+    expireDate: timestamp
+
+# Managerial Tables
+Blocked:
+  columns:
+    user:
+      type: ForeignKey
+      references: User
+    shop:
+      type: ForeignKey
+      references: Shop
+    product:
+      type: ForeignKey
+      references: Product
+    endDate: timestamp
+Policy:
+  columns:
+    number: integer
+    detail: Text
+    createdAt:
+      type: timestamp
+      isnull: false
+      default: DateTime.now()
+
+Report:
+  columns:
+    policy:
+      type: ForeignKey
+      references: Policy
+    shop:
+      type: ForeignKey
+      isnull: false
+      references: Shop
+    user:
+      type: ForeignKey
+      isnull: false
+      references: User
+    violator:
+      type: ForeignKey
+      references: User
+    product:
+      type: ForeignKey
+      references: Product
+    desc: Text

@@ -1,0 +1,19 @@
+version: "3.8"
+services:
+  pg:
+    image: postgres:alpine
+    restart: always
+    ports:
+      - 5454:5432
+    volumes:
+      - pg_data_test:/var/lib/postgresql/data
+    env_file:
+      - pg.env
+    shm_size: 1g
+    # resources:
+    #   limits:
+    #     cpus: 4
+    #     memory: 4g
+
+volumes:
+  pg_data_test:

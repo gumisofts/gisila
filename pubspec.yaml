@@ -1,0 +1,27 @@
+name: d_orm
+description: A sample command-line application.
+version: 1.0.0
+# repository: https://github.com/my_org/my_repo
+
+environment:
+  sdk: ^3.3.3
+
+# Add regular dependencies here.
+dependencies:
+  # path: ^1.8.0
+  build:
+  dart_style: ^2.3.6
+  json_annotation: ^4.8.1
+  postgres: ^3.1.2
+
+  analyzer: any
+  source_gen: any
+  yaml: any
+dev_dependencies:
+  lints: ^3.0.0
+  test: ^1.24.0
+  build_runner:
+  json_serializable: ^6.7.1
+  mocktail: ^1.0.0
+  very_good_analysis: ^5.1.0
+  
