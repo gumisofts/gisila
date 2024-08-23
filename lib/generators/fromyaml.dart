@@ -26,15 +26,6 @@ final pgTypes = [
   'boolean',
   'foreignkey',
 ];
-// String? getFieldType(YamlMap column, String typ) {
-//   final tt = typ.toLowerCase().trim();
-//   if (tt == 'foreignkey') {
-//     return column['references'] as String?;
-//   }
-
-//   return toDartOpMap[tt];
-// }
-
 String fieldType(dynamic column) {
   String? type;
   if (column.value is String) {
@@ -86,13 +77,9 @@ dynamic defaultValue(dynamic column) {
   return def;
 }
 
-// dynamic getDefault(String typ, dynamic value) {
-//   if (typ.toLowerCase().trim() == 'text') {
-//     return "'$value'";
-//   }
-
-//   return value;
-// }
+// TODO(nuradic): ForeignKey with reverse accessor,onDelete.
+// TODO(nuradic): OneToOneField with reverse accesor,onDelete.
+// TODO(nuradic): ManyToManyField with reverse accesor.
 
 class ModelFromYamlBuilder implements Builder {
   @override
@@ -159,10 +146,6 @@ Future<void> sqlConstructor(YamlMap map, BuildStep buildStep) async {
         isnull = (column.value['isnull'] as bool?) ?? true;
         unique = (column.value['unique'] as bool?) ?? false;
       }
-      // final def = defaultValueWrapper(column.value['default']);
-
-      // unique ??= false;
-
       if (!pgTypes.contains(typ!.toLowerCase())) {
         throw Exception('type $typ is not Valid DataType for postgress');
       }
@@ -175,6 +158,8 @@ Future<void> sqlConstructor(YamlMap map, BuildStep buildStep) async {
           'ref1': entry.key.toLowerCase(),
           'column': column.key,
           'ref2': column.value['references'].toLowerCase(),
+          'onDelete':
+              "on Delete ${column.value['onDelete']?.toLowerCase() ?? 'NO ACTION'}"
         });
       }
       if (unique) {
@@ -194,7 +179,7 @@ Future<void> sqlConstructor(YamlMap map, BuildStep buildStep) async {
   // right constraints
   for (final item in foreign) {
     sqlBuffer.writeln(
-      'ALTER TABLE "${item['ref1']}" ADD CONSTRAINT ${item['ref1']}_${item['column']}_${item['ref2']}_fk FOREIGN KEY ("${item['column']}Id") REFERENCES "${item['ref2']}" ("${item['ref2'].toLowerCase()}Id");',
+      'ALTER TABLE "${item['ref1']}" ADD CONSTRAINT ${item['ref1']}_${item['column']}_${item['ref2']}_fk FOREIGN KEY ("${item['column']}Id") REFERENCES "${item['ref2']}" ("${item['ref2'].toLowerCase()}Id") ${item['onDelete']};',
     );
 
     dropLines.add(
@@ -298,9 +283,11 @@ Future<void> modelConstructor(YamlMap map, BuildStep buildStep) async {
     ..writeln("part '${queryId.pathSegments.last}';");
 
   partBf.writeln("part of 'schema.dart';");
-
+  final models = <Model>[];
   for (final schema in map.entries) {
-    buffer.writeln(writeModel(schema));
+    models.add(writeModel(schema));
+    buffer.writeln(
+        writeModel(schema)); // TODO(nuradic) Dont forget to remove this line:
     partBf.writeln(db(schema));
   }
   final unformated = buffer.toString();
@@ -312,7 +299,7 @@ Future<void> modelConstructor(YamlMap map, BuildStep buildStep) async {
 
 // PG_Handler
 
-String writeModel(dynamic schema) {
+Model writeModel(dynamic schema) {
   // final buffer = StringBuffer();
 
   final model = Model(name: schema.key, columns: []);
@@ -351,7 +338,7 @@ String writeModel(dynamic schema) {
     ];
   }
 
-  return model.toString();
+  return model;
 }
 
 String db(dynamic schema) {

@@ -147,14 +147,6 @@ final class Query {
     return copy().._orderBy = [..._orderBy, field];
   }
 
-  // static String safeValue(dynamic value) {
-  //   return "'$value'";
-  // }
-
-  // static String safeToken(dynamic value) {
-  //   return '"$value"';
-  // }
-
   Query copy() {
     return Query()
       ..table = table
@@ -178,41 +170,4 @@ final class Query {
       .._offset = _offset
       .._limit = _limit;
   }
-}
-// class Column{
-
-// }
-// class Table{
-//   List <Column>
-
-// }
-
-class Select {
-  List<String> columns;
-  Select(this.columns);
-  From from(String table) {
-    return From(table);
-  }
-}
-
-class From {
-  String table;
-  From(this.table);
-
-  Include join() {
-    return Include(table);
-  }
-}
-
-class Include {
-  String table;
-  String? _onn;
-  Include(this.table);
-  Include onn(String onnn) {
-    return this.._onn = onnn;
-  }
-}
-
-void main(List<String> args) {
-  Select(['columns']).from('table').join();
 }

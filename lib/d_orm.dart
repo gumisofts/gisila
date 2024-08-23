@@ -1,5 +1,4 @@
 import 'package:d_orm/database/database.dart';
-import 'package:d_orm/models/schema.dart';
 export 'package:postgres/postgres.dart';
 export 'package:d_orm/database/connections.dart';
 export 'package:d_orm/database/database.dart';
@@ -20,9 +19,9 @@ void main(List<String> args) async {
 
   // user.save();
 
-  UserDb.filter(where: (t) => null);
+  // UserDb.filter(where: (t) => null);
 
-  ShopDb.filter(where: (t) => null);
+  // ShopDb.filter(where: (t) => null);
 
   // print(user);
   final sql = '''SELECT

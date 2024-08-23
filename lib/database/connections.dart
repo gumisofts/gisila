@@ -11,10 +11,11 @@ class Database {
   static PoolSettings? _poolSetting;
   static bool _inilized = false;
   static void Function(dynamic)? _logger;
-  factory Database.init(
-      {required List<Endpoint> endpoints,
-      required PoolSettings? poolSetting,
-      logger}) {
+  factory Database.init({
+    required List<Endpoint> endpoints,
+    required PoolSettings? poolSetting,
+    logger,
+  }) {
     _endpoints = endpoints;
     _poolSetting = poolSetting;
     if (_inilized) {
@@ -22,6 +23,7 @@ class Database {
     }
     _inilized = true;
     _logger = logger;
+    execute('SELECT 1');
     return _instance;
   }
 // Get pool  of the pg connection
@@ -31,9 +33,11 @@ class Database {
           parameters: parameters, queryMode: QueryMode.extended);
     }
     // Explain Query
-    final explained = await (await Database().pool).execute('Explain $sql',
-        parameters: parameters, queryMode: QueryMode.extended);
-    if (_logger != null) _logger!(explained);
+    if (sql is! Sql) {
+      final explained = await (await Database().pool).execute('Explain $sql',
+          parameters: parameters, queryMode: QueryMode.extended);
+      if (_logger != null) _logger!(explained);
+    }
     return (await Database().pool)
         .execute(sql, parameters: parameters, queryMode: QueryMode.extended);
   }
