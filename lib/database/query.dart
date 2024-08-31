@@ -1,5 +1,5 @@
-import 'package:d_orm/database/extensions.dart';
-import 'package:d_orm/database/operator.dart';
+import 'package:pg_dorm/database/extensions.dart';
+import 'package:pg_dorm/database/operator.dart';
 
 final class Query {
   Query();

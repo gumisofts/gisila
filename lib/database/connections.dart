@@ -1,4 +1,4 @@
-import 'package:d_orm/database/query.dart';
+import 'package:pg_dorm/database/query.dart';
 import 'package:postgres/postgres.dart';
 
 // Database for
@@ -23,7 +23,6 @@ class Database {
     }
     _inilized = true;
     _logger = logger;
-    execute('SELECT 1');
     return _instance;
   }
 // Get pool  of the pg connection
@@ -40,6 +39,10 @@ class Database {
     }
     return (await Database().pool)
         .execute(sql, parameters: parameters, queryMode: QueryMode.extended);
+  }
+
+  static checkConnection() {
+    execute('SELECT 1');
   }
 
   Future<Pool<Connection>> get pool async {

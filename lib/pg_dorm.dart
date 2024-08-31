@@ -1,12 +1,12 @@
-import 'package:d_orm/database/database.dart';
+import 'package:pg_dorm/database/database.dart';
 export 'package:postgres/postgres.dart';
-export 'package:d_orm/database/connections.dart';
-export 'package:d_orm/database/database.dart';
-export 'package:d_orm/database/exceptions.dart';
-export 'package:d_orm/database/extensions.dart';
-export 'package:d_orm/database/operator.dart';
-export 'package:d_orm/database/query.dart';
-export 'package:d_orm/database/models.dart';
+export 'package:pg_dorm/database/connections.dart';
+export 'package:pg_dorm/database/database.dart';
+export 'package:pg_dorm/database/exceptions.dart';
+export 'package:pg_dorm/database/extensions.dart';
+export 'package:pg_dorm/database/operator.dart';
+export 'package:pg_dorm/database/query.dart';
+export 'package:pg_dorm/database/models.dart';
 
 void main(List<String> args) async {
   // final user = await UserDb.create(firstName: 'Murad', lastName: "Hussen");

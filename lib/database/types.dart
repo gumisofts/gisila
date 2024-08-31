@@ -1,5 +1,5 @@
-import 'package:d_orm/database/exceptions.dart';
-import 'package:d_orm/database/extensions.dart';
+import 'package:pg_dorm/database/exceptions.dart';
+import 'package:pg_dorm/database/extensions.dart';
 
 class TypeAdapter {
   String? dart;

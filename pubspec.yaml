@@ -1,22 +1,21 @@
-name: d_orm
-description: A sample command-line application.
-version: 1.0.0
-# repository: https://github.com/my_org/my_repo
+name: pg_dorm
+description: Dart simple orm for postgress
+version: 0.0.1+2
+repository: https://github.com/gumi-apps/pg_dorm
 
 environment:
   sdk: ^3.3.3
-
 # Add regular dependencies here.
 dependencies:
   # path: ^1.8.0
-  build:
+  build: ^2.4.1
   dart_style: ^2.3.6
   json_annotation: ^4.8.1
   postgres: ^3.1.2
 
-  analyzer: any
-  source_gen: any
-  yaml: any
+  analyzer: ^6.8.0
+  source_gen: ^1.5.0
+  yaml: ^3.1.2
 dev_dependencies:
   lints: ^3.0.0
   test: ^1.24.0

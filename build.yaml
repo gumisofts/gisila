@@ -1,19 +1,20 @@
 targets:
   $default:
     builders:
-      d_orm:modelFromYamlGen:
+      pg_dorm:modelFromYamlGen:
         generate_for:
           - lib/models/schema.yaml
+          - test/models/schema.yaml
         enabled: true
       source_gen:combining_builder:
         enabled: true
-      d_orm:modelModifier:
+      pg_dorm:modelModifier:
         generate_for:
           - lib/**
         enabled: true
 builders:
   modelModifier:
-    import: "package:d_orm/generators/builder.dart" # Update this path to point to the actual file
+    import: "package:pg_dorm/generators/builder.dart" # Update this path to point to the actual file
     builder_factories: ["modelPartBuilder"]
     build_extensions: { ".dart": ["models.g.part"] }
     auto_apply: dependents
@@ -21,10 +22,10 @@ builders:
     applies_builders: ["source_gen:combining_builder"]
   modelFromYamlGen:
     runs_before:
-      - d_orm:modelModifier
+      - pg_dorm:modelModifier
       - source_gen:combining_builder
 
-    import: "package:d_orm/generators/builder.dart"
+    import: "package:pg_dorm/generators/builder.dart"
     builder_factories: ["modelFromYamlBuilder"]
     build_extensions: { ".yaml": [".dart"] }
     auto_apply: dependents

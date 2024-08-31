@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:build/build.dart';
-import 'package:d_orm/database/types.dart';
+import 'package:pg_dorm/database/types.dart';
 import 'package:dart_style/dart_style.dart';
 import 'package:yaml/yaml.dart';
 
@@ -278,7 +278,7 @@ Future<void> modelConstructor(YamlMap map, BuildStep buildStep) async {
   final queryId = cId.changeExtension('.query.g.dart');
   buffer
     ..writeln("import 'package:json_annotation/json_annotation.dart';")
-    ..writeln("import 'package:d_orm/d_orm.dart';")
+    ..writeln("import 'package:pg_dorm/pg_dorm.dart';")
     ..writeln("part '${partId.pathSegments.last}';")
     ..writeln("part '${queryId.pathSegments.last}';");
 
