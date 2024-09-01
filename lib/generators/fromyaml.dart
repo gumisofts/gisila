@@ -96,6 +96,7 @@ class ModelFromYamlBuilder implements Builder {
 
   @override
   Map<String, List<String>> get buildExtensions => {
+        '.yml': ['.dart', '.sql', '.drop.sql', '.query.g.dart', '.db.g.dart'],
         '.yaml': ['.dart', '.sql', '.drop.sql', '.query.g.dart', '.db.g.dart'],
       };
 }
