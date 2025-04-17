@@ -1,13 +1,9 @@
-import 'package:json_annotation/json_annotation.dart';
 import 'package:pg_dorm/pg_dorm.dart';
 part 'schema.db.g.dart';
 part 'schema.query.g.dart';
 
 class User {
-  User({
-    required String name,
-    this.id,
-  }) {
+  User({required String name, this.id}) {
     _name = name;
   }
 
@@ -54,13 +50,13 @@ class Book {
     _authorId = id;
   }
 
-  ModelHolder<User>? _getauthor;
-  Future<User?> get author {
-    _getauthor ??= ModelHolder<User>(
-        getModelInstance: () =>
-            UserDb.get(where: (t) => t.id.equals(authorId)));
-    return _getauthor!.instance;
-  }
+  // ModelHolder<User>? _getauthor;
+  // Future<User?> get author {
+  // _getauthor ??= ModelHolder<User>(
+  //   getModelInstance: () => UserDb.get(where: (t) => t.id.equals(authorId)),
+  // );
+  // return _getauthor!.instance;
+  // }
 
   final _updatedFields = <String, dynamic>{};
   int? id;

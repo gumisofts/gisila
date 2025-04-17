@@ -1,4 +1,4 @@
-import 'package:pg_dorm/database/exceptions.dart';
+import 'package:pg_dorm/database/postgres/exceptions.dart';
 import 'package:pg_dorm/database/extensions.dart';
 
 class TypeAdapter {
@@ -16,8 +16,9 @@ class TypeAdapter {
       ];
 
   TypeAdapter? operator [](String index) {
-    return TypeAdapter._types
-        .firstWhere((element) => element.pg == index.toLowerCase().trim());
+    return TypeAdapter._types.firstWhere(
+      (element) => element.pg == index.toLowerCase().trim(),
+    );
   }
 }
 
@@ -32,7 +33,8 @@ class DefaultEngine {
     if (type is DateTime) {
       if (syn == "now" || syn == "every_now") {
         throw DefaultValueException(
-            msg: "Not Valid default value for dateTime");
+          msg: "Not Valid default value for dateTime",
+        );
       }
     }
 
@@ -51,7 +53,8 @@ class DefaultEngine {
     if (type is double) {
       if (!RegExp(r"\d+\.?\d*").hasMatch(syn)) {
         throw DefaultValueException(
-            msg: "Invalid Default value for double type");
+          msg: "Invalid Default value for double type",
+        );
       }
 
       return syn;
@@ -94,7 +97,9 @@ class ForeignColumn {
   @override
   String toString() {
     final bf = StringBuffer()
-      ..writeln('${isnull ? '' : 'late'} int${isnull ? '?' : ''} _${name}Id;')
+      ..writeln(
+        '${isnull ? '' : 'late'} int${isnull ? '?' : ''} _${name}Id;',
+      )
       ..writeln("int${isnull ? '?' : ''} get ${name}Id=>_${name}Id;")
       ..writeln('set ${name}Id(int${isnull ? '?' : ''}  id) {')
       ..writeln('_updatedFields["$name"]=id;')
@@ -103,7 +108,8 @@ class ForeignColumn {
       ..writeln('ModelHolder<$reference>? _get$name;')
       ..writeln('Future<$reference?> get $name {')
       ..writeln(
-          '_get$name??=ModelHolder<$reference>(getModelInstance:()=> ${reference}Db.get(where:(t)=>t.id.equals(${name}Id${isnull ? "!" : ''})));')
+        '_get$name??=ModelHolder<$reference>(getModelInstance:()=> ${reference}Db.get(where:(t)=>t.id.equals(${name}Id${isnull ? "!" : ''})));',
+      )
       ..writeln('return _get$name!.instance;')
       ..writeln('}');
     return bf.toString();
@@ -136,7 +142,8 @@ class Column {
   String toString() {
     final bf = StringBuffer()
       ..writeln(
-          '${isnull ? '' : 'late'} ${type.dart}${isnull ? '?' : ''} _$name;')
+        '${isnull ? '' : 'late'} ${type.dart}${isnull ? '?' : ''} _$name;',
+      )
       ..writeln('${type.dart}${isnull ? '?' : ''} get $name=> _$name;')
       ..writeln('set $name(${type.dart}${isnull ? '?' : ''}  m) {')
       ..writeln("_updatedFields['$name']=m;")
@@ -184,7 +191,8 @@ class Model {
   String get filter {
     final bf = StringBuffer()
       ..writeln(
-          'static Future<Iterable<$name>> filter({required Operation? Function(${name}Query) where,List<String> orderBy = const [],int offset=0,int? limit,List<Join>joins=const [],})async{')
+        'static Future<Iterable<$name>> filter({required Operation? Function(${name}Query) where,List<String> orderBy = const [],int offset=0,int? limit,List<Join>joins=const [],})async{',
+      )
       ..writeln('final tt = where(${name}Query());')
       ..writeln('final query=Query.select(')
       ..writeln('table: ${name}Query.table,')
@@ -206,7 +214,8 @@ class Model {
   String get toJson {
     final bf = StringBuffer()
       ..writeln(
-          'Map<String,dynamic> toJson({bool excludeNull=false,List<String>? exclude,List<String>?only}){')
+        'Map<String,dynamic> toJson({bool excludeNull=false,List<String>? exclude,List<String>?only}){',
+      )
       ..writeln('final json= {')
       ..writeln("'id':id,")
       ..writeln(columns.map((e) => e.toMap).join())
@@ -271,7 +280,8 @@ class Model {
   String get getIt {
     final bf = StringBuffer()
       ..writeln(
-          'static Future<$name?> get({required Operation Function(${name}Query) where})async{')
+        'static Future<$name?> get({required Operation Function(${name}Query) where})async{',
+      )
       ..writeln('final res=await filter(where:where);')
       ..writeln('if(res.isEmpty)return null;')
       ..writeln('return res.first;')
@@ -290,10 +300,12 @@ class Model {
             .join(''),
       )
       ..writeln(foreign.map((e) => e.forNamed).join(''))
-      ..writeln(columns
-          .where((element) => element.isnull)
-          .map((e) => e.forNamed)
-          .join(''))
+      ..writeln(
+        columns
+            .where((element) => element.isnull)
+            .map((e) => e.forNamed)
+            .join(''),
+      )
       ..writeln('})async{')
       ..writeln('final model= $name(')
       ..writeln(columns.map((e) => '${e.name}:${e.name},').join('\n'))
@@ -318,11 +330,14 @@ class Model {
 
   String get delete {
     final bf = StringBuffer()
-      ..writeln('static Future<bool> delete($name ${name.toLowerCase()})async{')
+      ..writeln(
+        'static Future<bool> delete($name ${name.toLowerCase()})async{',
+      )
       ..writeln('final q=Query.delete(')
       ..writeln('table: "${name.toLowerCase()}",')
       ..writeln(
-          "operation: Operation('${name.toLowerCase()}Id'.safeTk,Operator.eq,${name.toLowerCase()}.id),")
+        "operation: Operation('${name.toLowerCase()}Id'.safeTk,Operator.eq,${name.toLowerCase()}.id),",
+      )
       ..writeln(');')
       ..writeln('try{')
       ..writeln('await Database.execute(q.toString());')
@@ -337,7 +352,9 @@ class Model {
 
   String get save {
     final bf = StringBuffer()
-      ..writeln('static Future<void> save($name ${name.toLowerCase()})async{')
+      ..writeln(
+        'static Future<void> save($name ${name.toLowerCase()})async{',
+      )
       ..writeln('')
       ..writeln('}');
     return bf.toString();
@@ -351,7 +368,8 @@ class Model {
       ..writeln('table: "${name.toLowerCase()}",')
       ..writeln('columns: _updatedFields,')
       ..writeln(
-          'operation: Operation("${name.toLowerCase()}Id".safeTk,Operator.eq,id),')
+        'operation: Operation("${name.toLowerCase()}Id".safeTk,Operator.eq,id),',
+      )
       ..writeln(');')
       ..writeln('await Database.execute(query.toString());')
       ..writeln('}')
@@ -372,10 +390,12 @@ class Model {
       )
       ..writeln(foreign.map((e) => e.forNamed).join(''))
       ..writeln('this.id,')
-      ..writeln(columns
-          .where((element) => element.isnull)
-          .map((e) => e.forNamed)
-          .join(''))
+      ..writeln(
+        columns
+            .where((element) => element.isnull)
+            .map((e) => e.forNamed)
+            .join(''),
+      )
       ..writeln('}){')
       ..writeln(columns.map((e) => '_${e.name}=${e.name};').join('\n'))
       ..writeln(foreign.map((e) => '_${e.name}Id=${e.name}Id;').join('\n'))

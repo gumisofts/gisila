@@ -1,6 +1,6 @@
 import 'package:build/build.dart';
-import 'package:pg_dorm/generators/fromyaml.dart';
-import 'package:pg_dorm/generators/generator.dart';
+import 'package:pg_dorm/generators/from_yaml.dart';
+import 'package:pg_dorm/generators/generators.dart';
 import 'package:source_gen/source_gen.dart';
 
 Builder modelPartBuilder(BuilderOptions options) =>

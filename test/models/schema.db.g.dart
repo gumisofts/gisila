@@ -1,12 +1,12 @@
 part of 'schema.dart';
 
 extension UserDb on User {
-  Map<String, dynamic> toJson(
-      {bool excludeNull = false, List<String>? exclude, List<String>? only}) {
-    final json = {
-      'id': id,
-      'name': name,
-    };
+  Map<String, dynamic> toJson({
+    bool excludeNull = false,
+    List<String>? exclude,
+    List<String>? only,
+  }) {
+    final json = {'id': id, 'name': name};
     if (excludeNull) {
       json.removeWhere((key, value) => value == null);
     }
@@ -20,27 +20,17 @@ extension UserDb on User {
 
   static User fromRow(ResultRow row) {
     final map = row.toColumnMap();
-    return User(
-      id: map["userId"] as int,
-      name: map["name"] as String,
-    );
+    return User(id: map["userId"] as int, name: map["name"] as String);
   }
 
   static Iterable<User> fromResult(Result result) {
     return result.map(fromRow);
   }
 
-  static Future<User> create({
-    required String name,
-  }) async {
-    final model = User(
-      name: name,
-    );
+  static Future<User> create({required String name}) async {
+    final model = User(name: name);
     final data = model.toJson(excludeNull: true);
-    final q = Query.insert(
-      table: 'user',
-      columns: data,
-    );
+    final q = Query.insert(table: 'user', columns: data);
     final res = await Database.execute(q.toString());
     return fromRow(res.first);
   }
@@ -78,8 +68,9 @@ extension UserDb on User {
     return fromResult(result);
   }
 
-  static Future<User?> get(
-      {required Operation Function(UserQuery) where}) async {
+  static Future<User?> get({
+    required Operation Function(UserQuery) where,
+  }) async {
     final res = await filter(where: where);
     if (res.isEmpty) return null;
     return res.first;
@@ -87,8 +78,11 @@ extension UserDb on User {
 }
 
 extension BookDb on Book {
-  Map<String, dynamic> toJson(
-      {bool excludeNull = false, List<String>? exclude, List<String>? only}) {
+  Map<String, dynamic> toJson({
+    bool excludeNull = false,
+    List<String>? exclude,
+    List<String>? only,
+  }) {
     final json = {
       'id': id,
       'title': title,
@@ -125,16 +119,9 @@ extension BookDb on Book {
     required int authorId,
     String? subtitle,
   }) async {
-    final model = Book(
-      title: title,
-      subtitle: subtitle,
-      authorId: authorId,
-    );
+    final model = Book(title: title, subtitle: subtitle, authorId: authorId);
     final data = model.toJson(excludeNull: true);
-    final q = Query.insert(
-      table: 'book',
-      columns: data,
-    );
+    final q = Query.insert(table: 'book', columns: data);
     final res = await Database.execute(q.toString());
     return fromRow(res.first);
   }
@@ -172,8 +159,9 @@ extension BookDb on Book {
     return fromResult(result);
   }
 
-  static Future<Book?> get(
-      {required Operation Function(BookQuery) where}) async {
+  static Future<Book?> get({
+    required Operation Function(BookQuery) where,
+  }) async {
     final res = await filter(where: where);
     if (res.isEmpty) return null;
     return res.first;

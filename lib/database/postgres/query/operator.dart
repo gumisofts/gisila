@@ -1,31 +1,40 @@
-enum QueryType { select, insert, update, delete }
+enum QueryType {
+  select('select'),
+  insert('insert'),
+  update('update'),
+  delete('delete');
+
+  final String type;
+  const QueryType(this.type);
+}
 
 enum Operator {
-  eq,
-  neq,
-  geq,
-  ge,
-  leq,
-  le,
-  isNull,
-  notNull,
-  between,
-  notBetween,
-  like,
-  ilike,
-  inn,
-  similar,
-  not,
-  and,
-  or
+  eq('='),
+  neq('!='),
+  geq('>='),
+  ge('>'),
+  leq('<='),
+  le('<'),
+  isNull('isnull'),
+  notNull('notnull'),
+  between('between'),
+  notBetween('not between'),
+  like('like'),
+  ilike('ilike'),
+  inn('in'),
+  similar('similar'),
+  not('not'),
+  and('and'),
+  or('or');
+
+  const Operator(this.dbType);
+  final String dbType;
+  @override
+  String toString() => dbType;
 }
 
 class Join {
-  Join({
-    required this.table,
-    required this.onn,
-    required this.from,
-  });
+  Join({required this.table, required this.onn, required this.from});
   final String table;
   final String from;
   final String onn;
@@ -34,6 +43,15 @@ class Join {
   String toString() => 'join $table on $onn';
 }
 
+// SELECT [DISTINCT] column_list
+// FROM table_name
+// [JOIN ...]
+// [WHERE condition]
+// [GROUP BY column_list]
+// [HAVING condition]
+// [ORDER BY column_list [ASC|DESC]]
+// [LIMIT n]
+// [OFFSET m];
 class Operation {
   Operation(this.leftOp, this.op, this.rightOp);
   factory Operation.unaryPrefix(Operator op, String right) {
@@ -60,7 +78,7 @@ class Operation {
 
   @override
   String toString() {
-    return '$leftOp ${dbEquvalentOp(op)} $rightOp';
+    return '$leftOp ${op.dbType} $rightOp';
   }
 
   Operation operator +(Operation op) {
@@ -84,48 +102,7 @@ class Operation {
   }
 }
 
-String dbEquvalentOp(Operator op) {
-  switch (op) {
-    case Operator.eq:
-      return '=';
-    case Operator.neq:
-      return '!=';
-    case Operator.geq:
-      return '>=';
-    case Operator.ge:
-      return '>';
-    case Operator.leq:
-      return '<=';
-    case Operator.le:
-      return '<';
-    case Operator.isNull:
-      return 'isnull';
-    case Operator.notNull:
-      return 'notnull';
-    case Operator.between:
-      return 'between';
-    case Operator.like:
-      return 'like';
-    case Operator.ilike:
-      return 'ilike';
-    case Operator.inn:
-      return 'in';
-    case Operator.similar:
-      return 'similar';
-    case Operator.not:
-      return 'not';
-    case Operator.and:
-      return 'and';
-    case Operator.or:
-      return 'or';
-    case Operator.notBetween:
-      return 'not between';
-  }
-}
-
-abstract class DBColumns {}
-
-abstract class BaseColumn<T> {
+class BaseColumn<T> {
   BaseColumn({
     required this.column,
     required this.offtable,
@@ -138,11 +115,6 @@ abstract class BaseColumn<T> {
   List<Join> _joins = const [];
   String? from;
   String? onColumn;
-
-  // Join? get join =>
-  //     from != null ? Join(table: offtable, onn: onColumn!, from: from!) : null;
-  // List<Join> get joins => [if (join != null) join!];
-  // from != null ? Join(table: offtable, onn: onColumn!, from: from!) : null;
 
   Operation equals(T other) {
     late Operation op;

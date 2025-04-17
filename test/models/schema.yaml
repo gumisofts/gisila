@@ -1,18 +1,24 @@
 User:
   columns:
     name:
-      type: Text
-      isnull: false
-    
+      type: text
+      is_null: false
+
+# char(50)
+# varchar(255)
+# text
 Book:
   columns:
     title:
-      type: Text
-      isnull: false
+      type: text
+      is_null: false
+      is_unique: true
+      is_index: true
+      is_primary: true # This is a primary key
     subtitle:
-      type: Text
-      isnull: true
+      type: text
+      is_null: true
     author:
       type: ForeignKey
       references: User
-      isnull: false
+      is_null: false

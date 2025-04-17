@@ -24,13 +24,16 @@ class BookQuery {
       TextColumn(column: 'title', offtable: 'book', depends: _joins);
   TextColumn get subtitle =>
       TextColumn(column: 'subtitle', offtable: 'book', depends: _joins);
-  UserQuery get author => UserQuery.referenced(joins: [
-        ..._joins,
-        Join(table: 'user', onn: 'authorId', from: table),
-      ]);
+  UserQuery get author => UserQuery.referenced(
+    joins: [..._joins, Join(table: 'user', onn: 'authorId', from: table)],
+  );
   NumberColumn get authorId =>
       NumberColumn(column: 'authorId', offtable: 'book', depends: _joins);
   final _joins = <Join>[];
-  static List<String> get columns =>
-      <String>['bookId', 'title', 'subtitle', 'authorId'];
+  static List<String> get columns => <String>[
+    'bookId',
+    'title',
+    'subtitle',
+    'authorId',
+  ];
 }

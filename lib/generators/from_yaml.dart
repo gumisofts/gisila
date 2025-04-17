@@ -31,12 +31,6 @@ String fieldType(dynamic column) {
   if (column.value is String) {
     type = toDartOpMap[column.value.toLowerCase()]!.dart;
 
-    if (type == null) {
-      throw Exception(
-        'Specify known type for the column ${column.key}: specified=>${column.value} ',
-      );
-    }
-
     return '$type?';
   }
 
@@ -127,8 +121,9 @@ Future<void> sqlConstructor(YamlMap map, BuildStep buildStep) async {
       ..writeln('"${entry.key.toLowerCase()}Id" SERIAL Primary Key');
     // dropBuffer.writeln('Drop Table ${entry.key};');
 
-    dropLines
-        .add('Drop Table If Exists "${entry.key.toString().toLowerCase()}";');
+    dropLines.add(
+      'Drop Table If Exists "${entry.key.toString().toLowerCase()}";',
+    );
 
     final columns = entry.value['columns'] as YamlMap;
 
@@ -160,16 +155,14 @@ Future<void> sqlConstructor(YamlMap map, BuildStep buildStep) async {
           'column': column.key,
           'ref2': column.value['references'].toLowerCase(),
           'onDelete':
-              "on Delete ${column.value['onDelete']?.toLowerCase() ?? 'NO ACTION'}"
+              "on Delete ${column.value['onDelete']?.toLowerCase() ?? 'NO ACTION'}",
         });
       }
       if (unique) {
-        uniqueCon.add(
-          {
-            'table': entry.key.toString().toLowerCase(),
-            'column': "${column.key}${isFor ? 'Id' : ''}",
-          },
-        );
+        uniqueCon.add({
+          'table': entry.key.toString().toLowerCase(),
+          'column': "${column.key}${isFor ? 'Id' : ''}",
+        });
       }
       sqlBuffer.writeln(
         ',"${column.key}${isFor ? 'Id' : ''}" $typ ${isnull ? '' : "not null"} ${def == null ? "" : "default ${defaultValueWrapper(def)}"}',
@@ -288,21 +281,22 @@ Future<void> modelConstructor(YamlMap map, BuildStep buildStep) async {
   for (final schema in map.entries) {
     models.add(writeModel(schema));
     buffer.writeln(
-        writeModel(schema)); // TODO(nuradic) Dont forget to remove this line:
+      writeModel(schema),
+    ); // TODO(nurads) Dont forget to remove this line:
     partBf.writeln(db(schema));
   }
   final unformated = buffer.toString();
   final formatted = DartFormatter().format(unformated);
   await buildStep.writeAsString(cId, formatted);
   await buildStep.writeAsString(
-      partId, DartFormatter().format(partBf.toString()));
+    partId,
+    DartFormatter().format(partBf.toString()),
+  );
 }
 
 // PG_Handler
 
 Model writeModel(dynamic schema) {
-  // final buffer = StringBuffer();
-
   final model = Model(name: schema.key, columns: []);
 
   for (var col in schema.value['columns'].entries) {
@@ -323,7 +317,7 @@ Model writeModel(dynamic schema) {
           isnull: isnull,
           unique: unique,
           defValue: defValue,
-        )
+        ),
       ];
       continue;
     }
@@ -335,7 +329,7 @@ Model writeModel(dynamic schema) {
         unique: unique,
         isnull: isnull,
         defValue: defValue.toString(),
-      )
+      ),
     ];
   }
 
@@ -363,7 +357,7 @@ String db(dynamic schema) {
           isnull: isnull,
           unique: unique,
           defValue: defValue,
-        )
+        ),
       ];
       continue;
     }
@@ -375,7 +369,7 @@ String db(dynamic schema) {
         unique: unique,
         isnull: isnull,
         defValue: defValue.toString(),
-      )
+      ),
     ];
   }
   bf

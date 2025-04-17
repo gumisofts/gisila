@@ -9,8 +9,8 @@ targets:
         enabled: true
 builders:
   modelFromYamlGen:
-    import: "package:pg_dorm/generators/builder.dart"
+    import: "package:pg_dorm/generators/builders.dart"
     builder_factories: ["modelFromYamlBuilder"]
-    build_extensions: { ".yml": [".dart"] ,"yaml":['.dart']}
+    build_extensions: { ".yml": [".dart"], "yaml": [".dart"] }
     auto_apply: dependents
     build_to: source

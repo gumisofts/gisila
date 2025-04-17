@@ -1,5 +1,5 @@
 import 'package:pg_dorm/database/extensions.dart';
-import 'package:pg_dorm/database/operator.dart';
+import 'package:pg_dorm/database/postgres/query/operator.dart';
 
 final class Query {
   Query();
@@ -24,12 +24,6 @@ final class Query {
     required String table,
     required Map<String, dynamic> columns,
   }) {
-    // columns.removeWhere((key, value) {
-    //   if (value == null) {
-    //     return MapEntry(key, value);
-    //   }
-    // });
-
     columns
       ..removeWhere((key, value) => value == null)
       ..remove('id');
@@ -55,10 +49,7 @@ final class Query {
       ..queryType = QueryType.update
       ..operation = operation;
   }
-  factory Query.delete({
-    required String table,
-    required Operation operation,
-  }) {
+  factory Query.delete({required String table, required Operation operation}) {
     return Query()
       ..table = table
       ..queryType = QueryType.delete

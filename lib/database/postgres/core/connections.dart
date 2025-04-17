@@ -1,7 +1,6 @@
-import 'package:pg_dorm/database/query.dart';
+import 'package:pg_dorm/database/postgres/query/query.dart';
 import 'package:postgres/postgres.dart';
 
-// Database for
 class Database {
   factory Database() => _instance;
   Database._init();
@@ -25,20 +24,29 @@ class Database {
     _logger = logger;
     return _instance;
   }
-// Get pool  of the pg connection
+  // Get pool  of the pg connection
   static Future<Result> execute(Object sql, {Object? parameters}) async {
     if (sql is Query) {
-      return (await Database().pool).execute(sql.toString(),
-          parameters: parameters, queryMode: QueryMode.extended);
+      return (await Database().pool).execute(
+        sql.toString(),
+        parameters: parameters,
+        queryMode: QueryMode.extended,
+      );
     }
     // Explain Query
     if (sql is! Sql) {
-      final explained = await (await Database().pool).execute('Explain $sql',
-          parameters: parameters, queryMode: QueryMode.extended);
+      final explained = await (await Database().pool).execute(
+        'Explain $sql',
+        parameters: parameters,
+        queryMode: QueryMode.extended,
+      );
       if (_logger != null) _logger!(explained);
     }
-    return (await Database().pool)
-        .execute(sql, parameters: parameters, queryMode: QueryMode.extended);
+    return (await Database().pool).execute(
+      sql,
+      parameters: parameters,
+      queryMode: QueryMode.extended,
+    );
   }
 
   static checkConnection() {
@@ -48,9 +56,12 @@ class Database {
   Future<Pool<Connection>> get pool async {
     if (!_inilized) {
       throw StateError(
-          'database is not initilized: did you forget to call Database.init');
+        'database is not initilized: did you forget to call Database.init',
+      );
     }
-    return _pool ??=
-        Pool<Connection>.withEndpoints(_endpoints!, settings: _poolSetting);
+    return _pool ??= Pool<Connection>.withEndpoints(
+      _endpoints!,
+      settings: _poolSetting,
+    );
   }
 }
