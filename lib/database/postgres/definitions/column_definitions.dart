@@ -16,6 +16,17 @@ class BaseColumnDefinition<T> {
       this.isIndex = false,
       this.isPrimaryKey = false,
       this.defaultValue});
+
+  factory BaseColumnDefinition.fromYamlMap(MapEntry<String, dynamic> entry) {
+    return BaseColumnDefinition(
+      name: entry.key,
+      isNull: entry.value['isNull'] as bool? ?? false,
+      isUnique: entry.value['isUnique'] as bool? ?? false,
+      isIndex: entry.value['isIndex'] as bool? ?? false,
+      isPrimaryKey: entry.value['isPrimaryKey'] as bool? ?? false,
+      defaultValue: entry.value['defaultValue'],
+    );
+  }
 }
 
 // String/Text
