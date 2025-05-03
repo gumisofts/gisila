@@ -33,7 +33,7 @@ class TableDefinition {
       name: entry.key,
       columns: (entry.value['columns'] as Map<String, dynamic>)
           .entries
-          .map((columnEntry) => BaseColumnDefinition.fromYamlMap(columnEntry))
+          .map((columnEntry) => BaseColumnDefinition.fromJson(columnEntry))
           .toList(),
       indexes:
           (((entry.value['indexes'] as Map<String, dynamic>?) ?? {}).entries)

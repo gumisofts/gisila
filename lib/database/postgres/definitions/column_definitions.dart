@@ -1,78 +1,58 @@
-import 'dart:ffi';
-
-import 'package:pg_dorm/pg_dorm.dart';
+import 'package:pg_dorm/database/postgres/data_types/mappings.dart';
 
 class BaseColumnDefinition<T> {
-  String name;
+  late String name;
   bool isNull;
   bool isUnique;
   bool isIndex;
   bool isPrimaryKey;
   T? defaultValue;
+  ColumnsDataType dbType;
+  String? references;
+  bool isManyToManyReferences;
   BaseColumnDefinition(
-      {required this.name,
+      {required String name,
+      required this.dbType,
       this.isNull = false,
       this.isUnique = false,
       this.isIndex = false,
       this.isPrimaryKey = false,
-      this.defaultValue});
+      this.isManyToManyReferences = false,
+      this.defaultValue,
+      this.references}) {
+    this.name = properColumnName(name);
+  }
 
-  factory BaseColumnDefinition.fromYamlMap(MapEntry<String, dynamic> entry) {
+  String properColumnName(String name) {
+    final n = name
+        .split('_')
+        .map((el) => "${el[0].toUpperCase()}${el.substring(1)}")
+        .join();
+
+    return "${n[0].toLowerCase()}${n.substring(1)}";
+  }
+
+  factory BaseColumnDefinition.fromJson(MapEntry<String, dynamic> entry) {
     return BaseColumnDefinition(
       name: entry.key,
-      isNull: entry.value['isNull'] as bool? ?? false,
-      isUnique: entry.value['isUnique'] as bool? ?? false,
-      isIndex: entry.value['isIndex'] as bool? ?? false,
-      isPrimaryKey: entry.value['isPrimaryKey'] as bool? ?? false,
-      defaultValue: entry.value['defaultValue'],
+      dbType: ColumnsDataType.values
+              .map((value) => value.name)
+              .toList()
+              .contains(entry.value['type'])
+          ? ColumnsDataType.values.byName(entry.value['type'] as String)
+          : ColumnsDataType.foreignKey,
+      isNull: entry.value['is_null'] as bool? ?? false,
+      references: ColumnsDataType.values
+              .map((value) => value.name)
+              .toList()
+              .contains(entry.value['type'])
+          ? null
+          : entry.value['type'],
+      isUnique: entry.value['is_unique'] as bool? ?? false,
+      isIndex: entry.value['is_index'] as bool? ?? false,
+      isManyToManyReferences: entry.value['many_to_many'] as bool? ?? false,
+      isPrimaryKey: entry.value['is_primary'] as bool? ?? false,
+      defaultValue: entry.value['default_value'],
     );
   }
-}
-
-// String/Text
-class CharfieldColumnDefinition extends BaseColumnDefinition<String> {
-  int maxLength;
-  CharfieldColumnDefinition(
-      {required super.name,
-      required this.maxLength,
-      super.isNull = false,
-      super.isUnique = false,
-      super.isIndex = false,
-      super.isPrimaryKey = false,
-      super.defaultValue});
-}
-
-class TextFieldColumnDefinition extends BaseColumnDefinition<String> {
-  TextFieldColumnDefinition({required super.name});
-}
-
-// Date/time
-
-class DateColumnDefinition extends BaseColumnDefinition<DateTime> {
-  bool useTimezone;
-  DateColumnDefinition({required super.name, this.useTimezone = false});
-}
-
-class DateTimeColumnDefinition extends BaseColumnDefinition<DateTime> {
-  bool useTimezone;
-  DateTimeColumnDefinition({required super.name, this.useTimezone = false});
-}
-
-class TimeColumnDefinition extends BaseColumnDefinition<Time> {
-  TimeColumnDefinition({required super.name});
-}
-
-class DateRangeColumnDefinition extends BaseColumnDefinition<DateRange> {
-  DateRangeColumnDefinition({required super.name});
-}
-
-// Numbers Column definitions
-
-class NumberColumnDefinition extends BaseColumnDefinition<num> {
-  NumberColumnDefinition({required super.name});
-}
-
-class DecimalColumnDefinition extends BaseColumnDefinition<Float> {
-  int precision;
-  DecimalColumnDefinition({required super.name, required this.precision});
 }

@@ -2,6 +2,7 @@ enum PostgresTypeMapping {
   boolean('bool'),
   smallInt('int'),
   int('int'),
+  integer('int'),
   bigInt('int'),
   serial('int'),
   bigSerial('int'),
@@ -38,4 +39,58 @@ enum PostgresTypeMapping {
 
   final String dartType;
   const PostgresTypeMapping(this.dartType);
+}
+
+enum ColumnsDataType {
+  boolean('boolean'),
+  smallInt('smallint'),
+  int('int'),
+  integer('integer'),
+  bigInt('bigint'),
+  serial('serial'),
+  bigSerial('bigserial'),
+  decimal('decimal'),
+  doublePrecision('double precision'),
+  real('numeric'),
+  char('char'),
+  varchar('varchar'),
+  text('text'),
+  date('date'),
+  datetz('datetz'),
+  timestamp('timestamp'),
+  timestamptz('timestamptz'),
+  time('time'),
+  timetz('timetz'),
+
+  interval('interval'),
+  uuid('uuid'),
+  inet('inet'),
+  cidr('cidr'),
+  macaddr('macaddr'),
+  json('json'),
+  jsonb('json'),
+  array('array'),
+  bytea('bytea'),
+  range('range'),
+  enumm('enum'),
+
+  point('point'),
+  line('line'),
+  box('box'),
+  circle('circle'),
+  lseg('lseg'),
+
+  foreignKey('foreignKey');
+
+  final String type;
+  const ColumnsDataType(this.type);
+}
+
+String getDartType(String dbType) {
+  final dbMappingType = {};
+  PostgresTypeMapping.values
+      .map((value) => value)
+      .forEach((value) => dbMappingType[value.name] = value.dartType);
+
+  return dbMappingType[dbType];
 }

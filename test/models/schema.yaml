@@ -1,20 +1,20 @@
 User:
   columns:
     first_name:
-      type: varchar(50)
+      type: varchar
       is_null: false
     last_name:
-      type: varchar(50)
+      type: varchar
       is_null: true
       allow_blank: true
     email:
-      type: varchar(255)
+      type: varchar
       is_null: false
       is_unique: true
       is_index: true
       allow_blank: false
     password:
-      type: varchar(255)
+      type: varchar
       is_null: false
       is_unique: false
       is_index: false
@@ -27,19 +27,19 @@ User:
       allow_blank: false
 
 # char(50)
-# varchar(255)
+# varchar
 # text
 Author:
   columns:
     first_name:
-      type: varchar(50)
+      type: varchar
       is_null: false
     last_name:
-      type: varchar(50)
+      type: varchar
       is_null: true
       allow_blank: true
     email:
-      type: varchar(255)
+      type: varchar
       is_null: false
       is_unique: true
       is_index: true
@@ -48,14 +48,14 @@ Author:
 Book:
   columns:
     title:
-      type: varchar(255)
+      type: varchar
       is_null: false
       is_unique: true
       is_index: true
       is_primary: true # This is a primary key
       allow_blank: false
     subtitle:
-      type: varchar(255)
+      type: varchar
       is_null: true
     description:
       type: text
@@ -64,7 +64,7 @@ Book:
       type: date
       is_null: true
     isbn:
-      type: varchar(13)
+      type: varchar
       is_null: true
       is_unique: true
       is_index: true

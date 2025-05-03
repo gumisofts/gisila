@@ -10,19 +10,13 @@ import 'package:yaml/yaml.dart';
 class FromYamlGenerator extends Builder {
   @override
   FutureOr<void> build(BuildStep buildStep) async {
-    final inputId = buildStep.inputId;
-
-    final schema = parseSchema(buildStep);
-
     final tableDefinitions = await parseSchemaToTableDefinitions(buildStep);
 
-    print(tableDefinitions);
+    await modelsGenerator(tableDefinitions, buildStep);
 
-    await modelsGenerator([], buildStep);
+    await queryGenerator(tableDefinitions, buildStep);
 
-    await queryGenerator([], buildStep);
-
-    await modelDbGenerator([], buildStep);
+    await modelDbGenerator(tableDefinitions, buildStep);
 
     // await
   }
