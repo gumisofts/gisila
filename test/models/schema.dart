@@ -35,6 +35,8 @@ class User {
     _email = email;
     _password = password;
     _dateJoined = dateJoined;
+    Future<void> save() async {}
+    Future<void> delete() => UserDb.delete(this);
   }
 }
 
@@ -59,6 +61,8 @@ class Author {
     _firstName = firstName;
     _lastName = lastName;
     _email = email;
+    Future<void> save() async {}
+    Future<void> delete() => AuthorDb.delete(this);
   }
 }
 
@@ -114,6 +118,8 @@ class Book {
     _pageCount = pageCount;
     _author = author;
     _reviewers = reviewers;
+    Future<void> save() async {}
+    Future<void> delete() => BookDb.delete(this);
   }
 }
 
@@ -187,5 +193,7 @@ class Review {
     _isSpam = isSpam;
     _isInappropriate = isInappropriate;
     _isHarmful = isHarmful;
+    Future<void> save() async {}
+    Future<void> delete() => ReviewDb.delete(this);
   }
 }

@@ -1,7 +1,3 @@
-import 'package:pg_dorm/database/postgres/core/connections.dart';
-import 'package:postgres/postgres.dart';
-import 'package:test/test.dart';
-
 // import 'models/schema.dart';
 
 // void main() async {

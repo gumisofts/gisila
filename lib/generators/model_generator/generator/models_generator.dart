@@ -37,8 +37,6 @@ String modelGenerator(TableDefinition definition) {
 
   buffer
     ..writeln(modelsConstructor(definition))
-    ..writeln()
-    ..writeln()
     ..writeln('}');
 
   return buffer.toString();
@@ -73,6 +71,8 @@ String modelsConstructor(TableDefinition definition) {
 
   buffer.writeln(assigned.join('\n'));
 
+  buffer.writeln(methodsGenerator(definition));
+
   buffer.writeln('}');
 
   return buffer.toString();
@@ -106,6 +106,16 @@ String modelsFieldGenerator(BaseColumnDefinition definition) {
       ..writeln(
           "set ${definition.name}(${definition.references}${definition.isNull ? "?" : ""} ${definition.name})=>_${definition.name}=${definition.name};");
   }
+
+  return buffer.toString();
+}
+
+String methodsGenerator(TableDefinition definition) {
+  final buffer = StringBuffer();
+
+  buffer
+    ..writeln('Future<void> save()async{}')
+    ..writeln('Future<void> delete()=>${definition.name}Db.delete(this);');
 
   return buffer.toString();
 }

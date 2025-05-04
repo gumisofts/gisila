@@ -1,6 +1,3 @@
-import 'package:pg_dorm/database/postgres/definitions/column_definitions.dart';
-import 'package:pg_dorm/database/postgres/definitions/table_definition.dart';
-
 // class Model {
 //   Model({
 //     required this.name,
@@ -243,29 +240,3 @@ import 'package:pg_dorm/database/postgres/definitions/table_definition.dart';
 //     return bf.toString();
 //   }
 // }
-
-List<TableDefinition> defineManyTables(List<Map<String, dynamic>> schemaJson) {
-  return schemaJson
-      .map((tableJson) => defineTable(
-            tableJson['name'] as String,
-            tableJson,
-          ))
-      .toList();
-}
-
-TableDefinition defineTable(String name, Map<String, dynamic> tableJson) {
-  final columnsJson = tableJson['columns'] as Map<String, dynamic>;
-
-  final columns = <BaseColumnDefinition>[];
-
-  for (var col in columnsJson.entries) {
-    columns.add(defineColumn(col.key, col.value));
-  }
-
-  return TableDefinition(name: name, columns: columns);
-}
-
-BaseColumnDefinition defineColumn(
-    String name, Map<String, dynamic> columnJson) {
-  return BaseColumnDefinition(name: name);
-}

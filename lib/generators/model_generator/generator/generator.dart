@@ -16,7 +16,7 @@ class FromYamlGenerator extends Builder {
 
     await queryGenerator(tableDefinitions, buildStep);
 
-    await modelDbGenerator(tableDefinitions, buildStep);
+    await modelsDbGenerator(tableDefinitions, buildStep);
 
     // await
   }
