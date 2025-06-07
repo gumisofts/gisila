@@ -2,6 +2,7 @@ import 'package:pg_dorm/database/postgres/data_types/mappings.dart';
 
 class BaseColumnDefinition<T> {
   late String name;
+  late String columnName;
   bool isNull;
   bool isUnique;
   bool isIndex;
@@ -21,6 +22,7 @@ class BaseColumnDefinition<T> {
       this.defaultValue,
       this.references}) {
     this.name = properColumnName(name);
+    columnName = name;
   }
 
   String properColumnName(String name) {

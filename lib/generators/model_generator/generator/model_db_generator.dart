@@ -27,7 +27,7 @@ String modelDbGenerator(TableDefinition definition) {
   buffer.writeln('class ${definition.name}Db{');
 
   buffer
-    ..writeln('static String table="${definition.name.toLowerCase()}";')
+    ..writeln('static String table="${definition.tableName}";')
     ..writeln(modelMethodGenerator(definition));
 
   buffer.writeln('}');
@@ -43,7 +43,9 @@ String modelMethodGenerator(TableDefinition definition) {
   buffer.writeln('static Future<${definition.name}> create({');
 
   for (var column in definition.columns) {
-    assigned.add('${column.name}:${column.name}');
+    if (!column.isManyToManyReferences && column.references == null) {
+      assigned.add('${column.name}:${column.name}');
+    }
     if (!column.isNull) {
       buffer.write('required ');
     }
@@ -51,11 +53,13 @@ String modelMethodGenerator(TableDefinition definition) {
       buffer.writeln(
           "${getDartType(column.dbType.type)}${column.isNull ? "?" : ""} ${column.name},");
     } else if (column.isManyToManyReferences) {
-      buffer.writeln(
-          'Iterator<${column.references}>${column.isNull ? "?" : ""} ${column.name},');
+      // buffer.writeln(
+      //     'Iterator<${column.references}>${column.isNull ? "?" : ""} ${column.name},');
     } else {
-      buffer.writeln(
-          '${column.references}${column.isNull ? "?" : ""} ${column.name},');
+      buffer.writeln('String${column.isNull ? "?" : ""} ${column.name}Id,');
+      assigned.add('${column.name}Id:${column.name}Id');
+      // buffer.writeln(
+      //     '${column.references}${column.isNull ? "?" : ""} ${column.name},');
     }
   }
 
@@ -64,11 +68,21 @@ String modelMethodGenerator(TableDefinition definition) {
     ..writeln('final columns=<String,dynamic>{');
 
   for (var column in definition.columns) {
-    buffer.writeln('"${column.name}":${column.name},');
+    if (column.isManyToManyReferences) {
+      continue;
+    }
+    if (column.references == null) {
+      buffer.writeln('"${column.columnName}":${column.name},');
+    } else {
+      buffer.writeln('"${column.columnName}Id":${column.name}Id,');
+    }
   }
 
   buffer.writeln('};');
-  buffer.writeln('final query=Query.insert(table: table, columns: columns);');
+  buffer
+    ..writeln('final query=Query.insert(table: table, columns: columns);')
+    ..writeln('final result=await Database.execute(query.toString());');
+
   buffer
     ..writeln('return ${definition.name}(')
     ..writeln(assigned.join(','))
@@ -77,8 +91,15 @@ String modelMethodGenerator(TableDefinition definition) {
 
   buffer
     ..writeln(
+        'static Future<Iterator<${definition.name}>> filter(Operation Function(${definition.name}Query) where)async{')
+    ..writeln('return Iterable<${definition.name}>.empty().iterator;')
+    ..writeln('}');
+
+  buffer
+    ..writeln(
         'static Future<void> delete(${definition.name} ${definition.name.toLowerCase()})')
     ..writeln("async{")
     ..writeln('}');
+
   return buffer.toString();
 }

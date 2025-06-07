@@ -1,0 +1,82 @@
+# Gisila Database Configuration
+# Example configuration showing multiple database connections
+
+# Default connection to use when no specific connection is specified
+default: postgres_main
+
+connections:
+  # Primary PostgreSQL database
+  postgres_main:
+    type: postgresql
+    host: localhost
+    port: 5432
+    database: gisila_app
+    username: postgres
+    password: your_password
+    ssl: false
+    connection_timeout: 30
+    query_timeout: 30
+    max_connections: 10
+    min_connections: 2
+    additional_params:
+      application_name: gisila_orm
+      search_path: public,extensions
+
+  # Read replica for reporting
+  postgres_read:
+    type: postgresql
+    host: replica.localhost
+    port: 5432
+    database: gisila_app
+    username: readonly_user
+    password: readonly_password
+    ssl: true
+    connection_timeout: 30
+    query_timeout: 60  # Longer timeout for reports
+    max_connections: 5
+    min_connections: 1
+    additional_params:
+      application_name: gisila_orm_readonly
+
+  # Local SQLite for testing
+  sqlite_test:
+    type: sqlite
+    database: test/test_database.db
+    connection_timeout: 10
+    query_timeout: 10
+    max_connections: 1
+    min_connections: 1
+
+  # MySQL for legacy data
+  mysql_legacy:
+    type: mysql
+    host: mysql.legacy.internal
+    port: 3306
+    database: legacy_system
+    username: legacy_user
+    password: legacy_password
+    ssl: true
+    connection_timeout: 30
+    query_timeout: 30
+    max_connections: 8
+    min_connections: 2
+    additional_params:
+      charset: utf8mb4
+      collation: utf8mb4_unicode_ci
+
+  # Analytics warehouse
+  postgres_analytics:
+    type: postgresql
+    host: analytics.internal
+    port: 5432
+    database: data_warehouse
+    username: analytics_user
+    password: analytics_password
+    ssl: true
+    connection_timeout: 60
+    query_timeout: 300  # 5 minutes for long analytics queries
+    max_connections: 3
+    min_connections: 1
+    additional_params:
+      application_name: gisila_analytics
+      statement_timeout: 300000 

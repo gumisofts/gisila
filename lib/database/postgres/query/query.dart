@@ -162,3 +162,110 @@ final class Query {
       .._limit = _limit;
   }
 }
+
+abstract class BaseColumn<T> {
+  BaseColumn({
+    required this.column,
+    required this.offtable,
+    List<Join> depends = const [],
+  }) {
+    _joins = depends;
+  }
+  String column;
+  String offtable;
+  List<Join> _joins = const [];
+  String? from;
+  String? onColumn;
+
+  Operation equals(T other) {
+    late Operation op;
+    if (other is String) {
+      final value = "'$other'";
+      op = Operation(toString(), Operator.eq, value);
+    } else {
+      op = Operation(toString(), Operator.eq, other);
+    }
+
+    return op..joins.addAll(_joins);
+  }
+
+  Operation notEquals(T other) {
+    return Operation(toString(), Operator.neq, other);
+  }
+
+  Operation isNull(T other) {
+    return Operation.unaryPostfix(toString(), Operator.isNull);
+  }
+
+  Operation isNotNull(T other) {
+    return Operation.unaryPostfix(toString(), Operator.notNull);
+  }
+
+  Operation inn(List<T> others) {
+    return Operation(toString(), Operator.inn, others);
+  }
+
+  @override
+  String toString() => '"$offtable"."$column"';
+}
+
+class TextColumn extends BaseColumn<String> {
+  TextColumn({required super.column, required super.offtable, super.depends});
+
+  Operation operator >=(String other) =>
+      Operation(toString(), Operator.geq, other)..tables.add(offtable);
+
+  Operation operator <=(String other) =>
+      Operation(toString(), Operator.leq, other)..tables.add(offtable);
+
+  Operation operator >(String other) =>
+      Operation(toString(), Operator.ge, other)..tables.add(offtable);
+
+  Operation operator <(String other) =>
+      Operation(toString(), Operator.le, other)..tables.add(offtable);
+  Operation ilike(String other) =>
+      Operation(toString(), Operator.ilike, other)..tables.add(offtable);
+  Operation like(String other) =>
+      Operation(toString(), Operator.like, other)..tables.add(offtable);
+  Operation contains(String other) =>
+      Operation(toString(), Operator.like, other)..tables.add(offtable);
+  Operation icontains(String other) =>
+      Operation(toString(), Operator.like, other)..tables.add(offtable);
+}
+
+class NumberColumn<T extends num> extends BaseColumn<T> {
+  NumberColumn({required super.column, required super.offtable, super.depends});
+
+  Operation operator >=(String other) =>
+      Operation(toString(), Operator.geq, other)..tables.add(offtable);
+
+  Operation operator <=(String other) =>
+      Operation(toString(), Operator.leq, other)..tables.add(offtable);
+
+  Operation operator >(String other) =>
+      Operation(toString(), Operator.ge, other)..tables.add(offtable);
+
+  Operation operator <(String other) =>
+      Operation(toString(), Operator.le, other)..tables.add(offtable);
+
+  Operation inRange(T first, T last) {
+    return Operation(toString(), Operator.between, last)..tables.add(offtable);
+  }
+}
+
+class BooleanColumn extends BaseColumn<bool> {
+  // BooleanColumn({required super.column, required super.offtable});
+  BooleanColumn(
+      {required super.column, required super.offtable, super.depends});
+}
+
+class DateTimeColumn extends BaseColumn<DateTime> {
+  // DateTimeColumn({required super.column, required super.offtable});
+  DateTimeColumn(
+      {required super.column, required super.offtable, super.depends});
+}
+
+class BaseDbQuery {
+  Operation operation;
+  BaseDbQuery(this.operation);
+}

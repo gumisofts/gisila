@@ -57,11 +57,12 @@ String modelsConstructor(TableDefinition definition) {
       buffer.writeln(
           "${getDartType(column.dbType.type)}${column.isNull ? "?" : ""} ${column.name},");
     } else if (column.isManyToManyReferences) {
-      buffer.writeln(
-          'Iterator<${column.references}>${column.isNull ? "?" : ""} ${column.name},');
+      // buffer.writeln(
+      //     'Iterator<${column.references}>${column.isNull ? "?" : ""} ${column.name},');
     } else {
-      buffer.writeln(
-          '${column.references}${column.isNull ? "?" : ""} ${column.name},');
+      buffer.writeln('String${column.isNull ? "?" : ""} ${column.name}Id,');
+      // buffer.writeln(
+      //     '${column.references}${column.isNull ? "?" : ""} ${column.name},');
     }
 
     assigned.add('_${column.name}=${column.name};');

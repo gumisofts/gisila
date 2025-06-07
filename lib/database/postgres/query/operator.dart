@@ -33,14 +33,42 @@ enum Operator {
   String toString() => dbType;
 }
 
+enum JoinType {
+  inner(''),
+  left('left'),
+  right('right'),
+  cross('full');
+
+  final String joinType;
+  const JoinType(this.joinType);
+}
+
 class Join {
-  Join({required this.table, required this.onn, required this.from});
+  Join(
+      {this.type = JoinType.inner,
+      required this.table,
+      required this.onn,
+      required this.from});
   final String table;
   final String from;
   final String onn;
+  final JoinType type;
+
+  factory Join.inner(
+          {required String table, required String onn, required String from}) =>
+      Join(table: table, onn: onn, from: from);
+  factory Join.left(
+          {required String table, required String onn, required String from}) =>
+      Join(type: JoinType.left, table: table, onn: onn, from: from);
+  factory Join.right(
+          {required String table, required String onn, required String from}) =>
+      Join(type: JoinType.right, table: table, onn: onn, from: from);
+  factory Join.cross(
+          {required String table, required String onn, required String from}) =>
+      Join(type: JoinType.cross, table: table, onn: onn, from: from);
 
   @override
-  String toString() => 'join $table on $onn';
+  String toString() => '${type.joinType} join $table on $onn';
 }
 
 // SELECT [DISTINCT] column_list

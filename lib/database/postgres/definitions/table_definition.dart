@@ -1,3 +1,4 @@
+import 'package:pg_dorm/database/postgres/data_types/mappings.dart';
 import 'package:pg_dorm/database/postgres/definitions/column_definitions.dart';
 
 class IndexDefinition {
@@ -22,11 +23,36 @@ class IndexDefinition {
 
 class TableDefinition {
   String name;
+  String? tableName;
   List<BaseColumnDefinition> columns;
   List<IndexDefinition> indexes;
+  late BaseColumnDefinition primaryColumnDefinition;
+  String properTableName(String name) {
+    final n = name
+        .split('_')
+        .map((el) => "${el[0].toUpperCase()}${el.substring(1)}")
+        .join();
+
+    return n;
+  }
 
   TableDefinition(
-      {required this.name, this.columns = const [], this.indexes = const []});
+      {required this.name,
+      this.columns = const [],
+      this.indexes = const [],
+      this.tableName}) {
+    name = properTableName(name);
+    tableName ??= name.toLowerCase();
+
+    primaryColumnDefinition = columns.firstWhere((col) => col.isPrimaryKey,
+        orElse: () => BaseColumnDefinition(
+              name: 'id',
+              dbType: ColumnsDataType.uuid,
+              isIndex: true,
+              isPrimaryKey: true,
+              isUnique: true,
+            ));
+  }
 
   factory TableDefinition.fromYamlMap(MapEntry<String, dynamic> entry) {
     return TableDefinition(

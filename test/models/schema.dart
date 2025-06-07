@@ -107,8 +107,7 @@ class Book {
     DateTime? publishedDate,
     String? isbn,
     int? pageCount,
-    required Author author,
-    Iterator<User>? reviewers,
+    required String authorId,
   }) {
     _title = title;
     _subtitle = subtitle;
@@ -170,8 +169,8 @@ class Review {
   late bool _isHarmful;
 
   Review({
-    required Book book,
-    required User reviewer,
+    required String bookId,
+    required String reviewerId,
     required int rating,
     String? reviewText,
     required DateTime reviewDate,
