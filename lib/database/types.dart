@@ -1,5 +1,5 @@
-import 'package:pg_dorm/database/postgres/exceptions.dart';
-import 'package:pg_dorm/database/extensions.dart';
+import 'package:gisila/database/postgres/exceptions.dart';
+import 'package:gisila/database/extensions.dart';
 
 class TypeAdapter {
   String? dart;

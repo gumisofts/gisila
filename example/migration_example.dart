@@ -51,12 +51,8 @@ Future<void> example1_basicMigrations() async {
   print('');
 
   // Create database configuration
-  final dbConfig = DatabaseConfig.programmatic({
-    'primary': DatabaseConnection(
-      type: DatabaseType.sqlite,
-      database: 'example.db',
-    ),
-  });
+  final dbConfig =
+      await DatabaseConfig.fromFile('example/database_config.yaml');
 
   // Initialize migration manager
   final manager = MigrationManager(dbConfig, 'example/migrations');
@@ -194,12 +190,8 @@ Future<void> example3_advancedOperations() async {
   print('📖 Example 3: Advanced Migration Operations');
   print('');
 
-  final dbConfig = DatabaseConfig.programmatic({
-    'primary': DatabaseConnection(
-      type: DatabaseType.sqlite,
-      database: 'advanced_example.db',
-    ),
-  });
+  final dbConfig =
+      await DatabaseConfig.fromFile('example/database_config.yaml');
 
   final manager = MigrationManager(dbConfig, 'example/migrations');
 
@@ -256,12 +248,8 @@ Future<void> example4_errorHandling() async {
   print('📖 Example 4: Error Handling and Recovery');
   print('');
 
-  final dbConfig = DatabaseConfig.programmatic({
-    'primary': DatabaseConnection(
-      type: DatabaseType.sqlite,
-      database: 'error_example.db',
-    ),
-  });
+  final dbConfig =
+      await DatabaseConfig.fromFile('example/database_config.yaml');
 
   final manager = MigrationManager(dbConfig, 'example/migrations');
 

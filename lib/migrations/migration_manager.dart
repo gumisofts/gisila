@@ -4,7 +4,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:path/path.dart' as path;
-import 'package:pg_dorm/config/config.dart';
+import 'package:gisila/config/config.dart';
 
 /// Represents a single migration file
 class Migration {

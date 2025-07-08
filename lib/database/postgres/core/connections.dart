@@ -1,4 +1,4 @@
-import 'package:pg_dorm/database/postgres/query/query.dart';
+import 'package:gisila/database/postgres/query/query.dart';
 import 'package:postgres/postgres.dart';
 
 class Database {

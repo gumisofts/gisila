@@ -1,8 +1,8 @@
 import 'package:build/build.dart';
 import 'package:dart_style/dart_style.dart';
-import 'package:pg_dorm/database/postgres/data_types/mappings.dart';
-import 'package:pg_dorm/database/postgres/definitions/column_definitions.dart';
-import 'package:pg_dorm/database/postgres/definitions/table_definition.dart';
+import 'package:gisila/database/postgres/data_types/mappings.dart';
+import 'package:gisila/database/postgres/definitions/column_definitions.dart';
+import 'package:gisila/database/postgres/definitions/table_definition.dart';
 
 Future<void> modelsGenerator(
   List<TableDefinition> definitions,

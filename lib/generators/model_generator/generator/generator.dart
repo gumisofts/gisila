@@ -1,10 +1,10 @@
 import 'dart:async';
 
 import 'package:build/build.dart';
-import 'package:pg_dorm/database/postgres/definitions/table_definition.dart';
-import 'package:pg_dorm/generators/model_generator/generator/model_db_generator.dart';
-import 'package:pg_dorm/generators/model_generator/generator/models_generator.dart';
-import 'package:pg_dorm/generators/model_generator/generator/query_generator.dart';
+import 'package:gisila/database/postgres/definitions/table_definition.dart';
+import 'package:gisila/generators/model_generator/generator/model_db_generator.dart';
+import 'package:gisila/generators/model_generator/generator/models_generator.dart';
+import 'package:gisila/generators/model_generator/generator/query_generator.dart';
 import 'package:yaml/yaml.dart';
 
 class FromYamlGenerator extends Builder {

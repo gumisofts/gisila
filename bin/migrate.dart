@@ -7,33 +7,25 @@ library;
 import 'dart:io';
 import 'dart:async';
 import 'package:args/args.dart';
-import 'package:pg_dorm/config/config.dart';
-import 'package:pg_dorm/migrations/migration_manager.dart';
-import 'package:pg_dorm/migrations/schema_differ.dart';
-import 'package:pg_dorm/generators/schema_parser.dart';
+import 'package:gisila/gisila.dart';
 
 void main(List<String> arguments) async {
   final parser = ArgParser();
-  
+
   // Global options
-  parser.addOption('config', 
-      abbr: 'c', 
+  parser.addOption('config',
+      abbr: 'c',
       help: 'Database configuration file',
       defaultsTo: 'database.yaml');
   parser.addOption('migrations-path',
       abbr: 'm',
       help: 'Path to migrations directory',
       defaultsTo: 'migrations');
-  parser.addOption('connection',
-      help: 'Database connection name');
+  parser.addOption('connection', help: 'Database connection name');
   parser.addFlag('verbose',
-      abbr: 'v',
-      help: 'Enable verbose output',
-      negatable: false);
+      abbr: 'v', help: 'Enable verbose output', negatable: false);
   parser.addFlag('help',
-      abbr: 'h',
-      help: 'Show this help message',
-      negatable: false);
+      abbr: 'h', help: 'Show this help message', negatable: false);
 
   // Commands
   parser.addCommand('migrate', createMigrateCommand());
@@ -45,7 +37,7 @@ void main(List<String> arguments) async {
 
   try {
     final results = parser.parse(arguments);
-    
+
     if (results['help'] as bool || results.command == null) {
       showHelp(parser);
       return;
@@ -66,32 +58,24 @@ ArgParser createMigrateCommand() {
       help: 'Show what would be executed without making changes',
       negatable: false);
   parser.addFlag('force',
-      help: 'Continue applying migrations even if one fails',
-      negatable: false);
+      help: 'Continue applying migrations even if one fails', negatable: false);
   parser.addFlag('no-backup',
-      help: 'Skip creating database backup',
-      negatable: false);
+      help: 'Skip creating database backup', negatable: false);
   return parser;
 }
 
 ArgParser createRollbackCommand() {
   final parser = ArgParser();
   parser.addOption('steps',
-      abbr: 's',
-      help: 'Number of migrations to rollback',
-      defaultsTo: '1');
-  parser.addOption('to',
-      abbr: 't',
-      help: 'Rollback to specific migration ID');
+      abbr: 's', help: 'Number of migrations to rollback', defaultsTo: '1');
+  parser.addOption('to', abbr: 't', help: 'Rollback to specific migration ID');
   parser.addFlag('dry-run',
       help: 'Show what would be executed without making changes',
       negatable: false);
   parser.addFlag('force',
-      help: 'Continue rolling back even if one fails',
-      negatable: false);
+      help: 'Continue rolling back even if one fails', negatable: false);
   parser.addFlag('no-backup',
-      help: 'Skip creating database backup',
-      negatable: false);
+      help: 'Skip creating database backup', negatable: false);
   return parser;
 }
 
@@ -102,10 +86,7 @@ ArgParser createStatusCommand() {
 
 ArgParser createGenerateCommand() {
   final parser = ArgParser();
-  parser.addOption('name',
-      abbr: 'n',
-      help: 'Migration name',
-      mandatory: true);
+  parser.addOption('name', abbr: 'n', help: 'Migration name', mandatory: true);
   parser.addOption('old-schema',
       help: 'Path to old schema file for comparison');
   parser.addOption('new-schema',
@@ -116,17 +97,13 @@ ArgParser createGenerateCommand() {
 ArgParser createDiffCommand() {
   final parser = ArgParser();
   parser.addOption('old-schema',
-      help: 'Path to old schema file',
-      mandatory: true);
+      help: 'Path to old schema file', mandatory: true);
   parser.addOption('new-schema',
-      help: 'Path to new schema file', 
-      mandatory: true);
+      help: 'Path to new schema file', mandatory: true);
   parser.addFlag('generate-migration',
-      help: 'Generate migration files from diff',
-      negatable: false);
+      help: 'Generate migration files from diff', negatable: false);
   parser.addOption('migration-name',
-      help: 'Name for generated migration',
-      defaultsTo: 'schema_changes');
+      help: 'Name for generated migration', defaultsTo: 'schema_changes');
   return parser;
 }
 
@@ -146,7 +123,8 @@ Future<void> runCommand(ArgResults results) async {
   try {
     dbConfig = await DatabaseConfig.fromFile(configPath);
   } catch (e) {
-    throw Exception('Failed to load database configuration from $configPath: $e');
+    throw Exception(
+        'Failed to load database configuration from $configPath: $e');
   }
 
   final manager = MigrationManager(dbConfig, migrationsPath);
@@ -242,7 +220,7 @@ Future<void> runRollback(
 
   final stepsStr = command['steps'] as String;
   final toMigration = command['to'] as String?;
-  
+
   int? steps;
   if (toMigration == null) {
     steps = int.tryParse(stepsStr);
@@ -318,40 +296,41 @@ Future<void> runGenerate(ArgResults command, String migrationsPath) async {
   if (oldSchemaPath != null && newSchemaPath != null) {
     // Generate migration from schema diff
     print('🔍 Comparing schemas...');
-    
+
     final oldSchema = await SchemaDefinition.fromFile(oldSchemaPath);
     final newSchema = await SchemaDefinition.fromFile(newSchemaPath);
-    
+
     final differ = SchemaDiffer();
     final diff = differ.compareSchemas(oldSchema, newSchema);
-    
+
     if (diff.isEmpty) {
       print('✅ No schema changes detected');
       return;
     }
-    
+
     print('📦 Found ${diff.changes.length} changes:');
     for (final change in diff.changes) {
       final indicator = diff.hasDestructiveChanges ? '⚠️ ' : '✅ ';
       print('  $indicator$change');
     }
-    
+
     if (diff.hasDestructiveChanges) {
       print('');
-      print('⚠️  WARNING: This migration contains destructive changes that may result in data loss!');
+      print(
+          '⚠️  WARNING: This migration contains destructive changes that may result in data loss!');
     }
-    
+
     await differ.generateMigrationFile(diff, migrationsPath, name);
   } else {
     // Generate empty migration
     print('📝 Generating empty migration: $name');
-    
+
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final upFile = File('$migrationsPath/${timestamp}_$name.sql');
     final downFile = File('$migrationsPath/${timestamp}_$name.down.sql');
-    
+
     await Directory(migrationsPath).create(recursive: true);
-    
+
     final upContent = '''-- Migration: $name
 -- Generated on: ${DateTime.now().toIso8601String()}
 
@@ -374,7 +353,7 @@ COMMIT;
 
     await upFile.writeAsString(upContent);
     await downFile.writeAsString(downContent);
-    
+
     print('✅ Generated migration files:');
     print('   Up:   ${upFile.path}');
     print('   Down: ${downFile.path}');
@@ -413,7 +392,8 @@ Future<void> runDiff(ArgResults command, String migrationsPath) async {
 
   if (diff.hasDestructiveChanges) {
     print('');
-    print('⚠️  WARNING: Schema contains destructive changes that may result in data loss!');
+    print(
+        '⚠️  WARNING: Schema contains destructive changes that may result in data loss!');
   }
 
   print('');
@@ -438,15 +418,16 @@ Future<void> runInit(
   bool verbose,
 ) async {
   print('🏗️  Initializing migration system...');
-  
+
   try {
     await manager.initialize(connectionName: connectionName);
     print('✅ Migration system initialized successfully!');
-    
+
     if (verbose) {
       print('');
       print('💡 Next steps:');
-      print('   1. Generate your first migration: dart run bin/migrate.dart generate -n initial_schema');
+      print(
+          '   1. Generate your first migration: dart run bin/migrate.dart generate -n initial_schema');
       print('   2. Apply migrations: dart run bin/migrate.dart migrate');
       print('   3. Check status: dart run bin/migrate.dart status');
     }
@@ -505,10 +486,12 @@ void showHelp(ArgParser parser) {
   print('  dart run bin/migrate.dart rollback -s 2');
   print('');
   print('  # Generate migration from schema changes');
-  print('  dart run bin/migrate.dart generate -n add_user_table --old-schema=old.yaml --new-schema=new.yaml');
+  print(
+      '  dart run bin/migrate.dart generate -n add_user_table --old-schema=old.yaml --new-schema=new.yaml');
   print('');
   print('  # Show differences between schemas');
-  print('  dart run bin/migrate.dart diff --old-schema=old.yaml --new-schema=new.yaml');
+  print(
+      '  dart run bin/migrate.dart diff --old-schema=old.yaml --new-schema=new.yaml');
   print('');
   print('  # Check migration status');
   print('  dart run bin/migrate.dart status');

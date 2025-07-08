@@ -1,7 +1,7 @@
-import 'package:pg_dorm/database/extensions.dart';
-import 'package:pg_dorm/database/postgres/query/operator.dart';
+import 'package:gisila/database/extensions.dart';
+import 'package:gisila/database/postgres/query/operator.dart';
 
-final class Query {
+class Query {
   Query();
   factory Query.select({
     required String table,

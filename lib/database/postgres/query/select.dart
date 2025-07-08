@@ -1,5 +1,5 @@
-import 'package:pg_dorm/database/extensions.dart';
-import 'package:pg_dorm/database/postgres/query/operator.dart';
+import 'package:gisila/database/extensions.dart';
+import 'package:gisila/database/postgres/query/operator.dart';
 
 class SelectQuery {
   final List<String> _fields;

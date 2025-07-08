@@ -1,16 +1,16 @@
 #!/usr/bin/env dart
 
 /// Gisila ORM Code Generator CLI Tool
-/// 
+///
 /// Generates Dart model classes and SQL migrations from YAML schema definitions.
-/// 
+///
 /// Usage:
 ///   dart run bin/generate.dart --schema=schema.yaml --output=lib/generated
 ///   dart run bin/generate.dart --help
 
 import 'dart:io';
 import 'package:args/args.dart';
-import '../lib/generators/code_generator.dart';
+import 'package:gisila/gisila.dart';
 
 void main(List<String> arguments) async {
   final parser = ArgParser()
@@ -100,7 +100,7 @@ void main(List<String> arguments) async {
       print('🎉 Code generation completed successfully!');
       print('');
       print('Generated files are available in: $outputPath');
-      
+
       if (!modelsOnly && !migrationsOnly) {
         print('');
         print('📂 Generated structure:');
@@ -120,13 +120,14 @@ void main(List<String> arguments) async {
       print('');
       print('💡 Next steps:');
       if (!migrationsOnly) {
-        print('   1. Import generated models: import \'$outputPath/models/models.dart\';');
+        print(
+            '   1. Import generated models: import \'$outputPath/models/models.dart\';');
       }
       if (!modelsOnly) {
         print('   2. Run migrations against your database');
       }
-      print('   3. Implement the DatabaseContext methods with your database driver');
-
+      print(
+          '   3. Implement the DatabaseContext methods with your database driver');
     } catch (e, stackTrace) {
       print('❌ Error during code generation: $e');
       if (verbose) {
@@ -136,7 +137,6 @@ void main(List<String> arguments) async {
       }
       exit(1);
     }
-
   } catch (e) {
     print('❌ Error parsing arguments: $e');
     print('');
@@ -149,7 +149,8 @@ void _printHelp(ArgParser parser) {
   print('Gisila ORM Code Generator');
   print('=========================');
   print('');
-  print('Generates Dart model classes and SQL migrations from YAML schema definitions.');
+  print(
+      'Generates Dart model classes and SQL migrations from YAML schema definitions.');
   print('');
   print('Usage:');
   print('  dart run bin/generate.dart [options]');
@@ -159,11 +160,13 @@ void _printHelp(ArgParser parser) {
   print('');
   print('Examples:');
   print('  dart run bin/generate.dart');
-  print('  dart run bin/generate.dart --schema=my_schema.yaml --output=lib/models');
+  print(
+      '  dart run bin/generate.dart --schema=my_schema.yaml --output=lib/models');
   print('  dart run bin/generate.dart --models-only --verbose');
   print('  dart run bin/generate.dart --migrations-only');
   print('');
   print('Schema file format:');
-  print('  The schema file should be a YAML file defining your database models.');
+  print(
+      '  The schema file should be a YAML file defining your database models.');
   print('  See the documentation for the complete schema specification.');
-} 
+}

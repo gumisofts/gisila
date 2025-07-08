@@ -194,32 +194,31 @@ Future<void> _relationshipQueryExamples() async {
   // Query books with high-rated reviews
   print('✅ Query books with high-rated reviews:');
   try {
-    final reviews = await Review.where(Review.query().rating >=
-        '4' &
-            Review.query().isApproved.equals(true) &
-            ~Review.query().isSpam.equals(true));
+    final reviews = await Review.where(Review.query().rating >= '4' &&
+        Review.query().is_approved.equals(true) &
+            ~Review.query().is_spam.equals(true));
   } catch (e) {
     print(
         '   Would execute: SELECT * FROM review WHERE rating >= 4 AND is_approved = true AND NOT is_spam = true');
   }
 
-  print();
+  print('');
 }
 
 /// Examples comparing old vs new syntax
 void _syntaxComparison() {
   print('📊 Syntax Comparison:');
-  print();
+  print('');
 
   print('❌ OLD (String-based, error-prone):');
   print(
       '   User.findAll(where: "email = ? AND first_name LIKE ?", parameters: ["john@example.com", "John%"])');
-  print();
+  print('');
 
   print('✅ NEW (Type-safe, IDE-friendly):');
   print(
       '   User.where(User.query().email.equals("john@example.com") & User.query().first_name.like("John%"))');
-  print();
+  print('');
 
   print('🎯 Benefits:');
   print('   ✓ Type safety - no runtime SQL errors');
@@ -228,18 +227,18 @@ void _syntaxComparison() {
   print('   ✓ Refactoring support');
   print('   ✓ No SQL injection risks');
   print('   ✓ Readable and maintainable code');
-  print();
+  print('');
 }
 
 /// Advanced query examples
 void _advancedExamples() {
   print('🚀 Advanced Query Examples:');
-  print();
+  print('');
 
   print('✅ Find first user:');
   print(
       '   final user = await User.firstWhere(User.query().email.equals("admin@example.com"));');
-  print();
+  print('');
 
   print('✅ Custom query builder:');
   print('   final query = User.query()');
@@ -247,10 +246,10 @@ void _advancedExamples() {
   print('     ..limit(10)');
   print('     ..orderBy("first_name");');
   print('   final users = await User.findWhere(query);');
-  print();
+  print('');
 
   print('✅ Null checks:');
   print('   User.where(User.query().last_name.isNull())');
   print('   User.where(User.query().last_name.isNotNull())');
-  print();
+  print('');
 }

@@ -1,5 +1,5 @@
-import 'package:pg_dorm/database/postgres/data_types/mappings.dart';
-import 'package:pg_dorm/database/postgres/definitions/column_definitions.dart';
+import 'package:gisila/database/postgres/data_types/mappings.dart';
+import 'package:gisila/database/postgres/definitions/column_definitions.dart';
 
 class IndexDefinition {
   String name;
