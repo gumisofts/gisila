@@ -15,6 +15,11 @@ final users = await Query<User>(UserTable.metadata)
     .all(db);
 ```
 
+> **New here?** Read **[GETTING_STARTED.md](GETTING_STARTED.md)** first — a
+> 15-minute, step-by-step tutorial that takes you from `dart create` to a
+> working schema, migration, and tested query. The rest of this README is a
+> reference; the tutorial is the one to read top-to-bottom.
+
 ---
 
 ## Table of contents
