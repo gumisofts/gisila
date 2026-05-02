@@ -353,6 +353,91 @@ See [`example/models/blog.gisila.yaml`](example/models/blog.gisila.yaml) for
 a four-model schema (User, Author, Book, Review) exercising every feature
 above and its [generated `.g.dart`](example/models/blog.gisila.g.dart).
 
+### Schema validation & error reporting
+
+Every `.gisila.yaml` is run through a strict validator before code is
+emitted. Mistakes surface as `rustc`-style diagnostics with the file
+path, line, column, an arrow under the offending token, and (where
+possible) a "did you mean?" suggestion.
+
+The validator collects **every** problem in a single pass — so one
+rebuild surfaces every typo at once instead of one-per-build. Severity
+is colorized when the terminal supports ANSI escapes; pipe through a
+file or set `NO_COLOR=1` to get plain text suitable for CI logs.
+
+Sample input:
+
+```yaml
+User:
+  collumns:                   # typo'd key
+    name:
+      type: varchars          # typo'd type
+      is_null: yes            # not a bool
+
+Post:
+  columns:
+    author:
+      type: Authour           # unknown model
+      references: Authour
+      on_delete: CASCAD       # typo'd action
+```
+
+Renders:
+
+```text
+error[unknown_key]: unknown key "collumns" on model "User"
+ --> lib/models/blog.gisila.yaml:2:3
+   |
+ 2 |   collumns:
+   |   ^^^^^^^^ did you mean "columns"?
+
+error[invalid_value]: `is_null` on "User.name" must be a boolean (true or false)
+ --> lib/models/blog.gisila.yaml:5:16
+   |
+ 5 |       is_null: yes
+   |                ^^^ change to `is_null: true` (the default)
+
+error[unknown_type]: unknown column type "varchars"
+ --> lib/models/blog.gisila.yaml:4:13
+   |
+ 4 |       type: varchars
+   |             ^^^^^^^^ did you mean "varchar"?
+
+error[unknown_reference]: "Post.author" references unknown model "Authour"
+ --> lib/models/blog.gisila.yaml:11:19
+    |
+ 11 |       references: Authour
+    |                   ^^^^^^^ did you mean "Author"?
+
+error[invalid_referential_action]: `on_delete` must be one of: NO ACTION, RESTRICT, CASCADE, SET NULL, SET DEFAULT
+ --> lib/models/blog.gisila.yaml:12:18
+    |
+ 12 |       on_delete: CASCAD
+    |                  ^^^^^^ did you mean "CASCADE"?
+
+aborting due to 5 errors
+```
+
+Every error has a stable code (`unknown_type`, `unknown_reference`,
+`invalid_value`, `duplicate_key`, `missing_columns`,
+`reverse_name_collision`, …) so it can be grepped, suppressed, or
+documented. Building programmatically? Catch `SchemaValidationException`
+and call `e.format(color: false)` to get the same report as a string:
+
+```dart
+try {
+  final schema = SchemaDefinition.fromYaml(
+    yamlContent,
+    sourceUrl: Uri.parse('lib/models/blog.gisila.yaml'),
+  );
+} on SchemaValidationException catch (e) {
+  stderr.writeln(e.format(color: false));
+  for (final err in e.errors) {
+    print('${err.code}: ${err.message} at ${err.span.start.toolString}');
+  }
+}
+```
+
 ---
 
 ## Code generation
