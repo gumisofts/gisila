@@ -93,7 +93,7 @@ class YamlSchemaToDartGenerator {
       } else if (colDef.containsKey('references')) {
         // One-to-many / Many-to-one relationship (foreign key and object reference)
         final String referencedEntity = colDef['references'].toString();
-        final String referencedClassName = _capitalize(referencedEntity);
+        // final String referencedClassName = _capitalize(referencedEntity);
         final YamlMap referencedEntityData = allEntities[referencedEntity]!;
         final YamlMap referencedColumns =
             referencedEntityData['columns'] as YamlMap;
