@@ -1,5 +1,5 @@
 /// Schema parser for Gisila ORM
-/// 
+///
 /// Parses YAML schema definitions and converts them into structured
 /// model representations for code generation.
 library gisila.generators.schema_parser;
@@ -79,7 +79,7 @@ class RelationshipConfig {
         references = typeStr;
       }
     }
-    
+
     return RelationshipConfig(
       references: references,
       reverseName: map['reverse_name'] as String?,
@@ -166,7 +166,8 @@ class ColumnDefinition {
     }
   }
 
-  bool get isRelationship => type == ColumnType.foreignKey || type == ColumnType.manyToMany;
+  bool get isRelationship =>
+      type == ColumnType.foreignKey || type == ColumnType.manyToMany;
 
   factory ColumnDefinition.fromMap(String name, Map<String, dynamic> map) {
     final typeStr = map['type'] as String;
@@ -198,15 +199,24 @@ class ColumnDefinition {
 
   /// Check if type string represents a model (starts with uppercase)
   static bool _isModelType(String typeStr) {
-    return typeStr.isNotEmpty && typeStr[0] == typeStr[0].toUpperCase() && 
-           !_isBuiltinType(typeStr);
+    return typeStr.isNotEmpty &&
+        typeStr[0] == typeStr[0].toUpperCase() &&
+        !_isBuiltinType(typeStr);
   }
 
   /// Check if type string is a builtin type
   static bool _isBuiltinType(String typeStr) {
     const builtinTypes = {
-      'varchar', 'text', 'integer', 'bigint', 'boolean', 
-      'date', 'timestamp', 'decimal', 'json', 'uuid'
+      'varchar',
+      'text',
+      'integer',
+      'bigint',
+      'boolean',
+      'date',
+      'timestamp',
+      'decimal',
+      'json',
+      'uuid'
     };
     return builtinTypes.contains(typeStr.toLowerCase());
   }
@@ -278,27 +288,27 @@ class ModelDefinition {
   });
 
   /// Get all regular columns (non-relationship)
-  List<ColumnDefinition> get regularColumns => 
+  List<ColumnDefinition> get regularColumns =>
       columns.where((col) => !col.isRelationship).toList();
 
   /// Get all foreign key columns
-  List<ColumnDefinition> get foreignKeyColumns => 
+  List<ColumnDefinition> get foreignKeyColumns =>
       columns.where((col) => col.type == ColumnType.foreignKey).toList();
 
   /// Get all many-to-many relationships
-  List<ColumnDefinition> get manyToManyColumns => 
+  List<ColumnDefinition> get manyToManyColumns =>
       columns.where((col) => col.type == ColumnType.manyToMany).toList();
 
   /// Get primary key column
-  ColumnDefinition? get primaryKey => 
+  ColumnDefinition? get primaryKey =>
       columns.where((col) => col.constraints.isPrimary).firstOrNull;
 
   /// Get unique columns
-  List<ColumnDefinition> get uniqueColumns => 
+  List<ColumnDefinition> get uniqueColumns =>
       columns.where((col) => col.constraints.isUnique).toList();
 
   /// Get indexed columns
-  List<ColumnDefinition> get indexedColumns => 
+  List<ColumnDefinition> get indexedColumns =>
       columns.where((col) => col.constraints.isIndex).toList();
 
   factory ModelDefinition.fromMap(String name, Map<String, dynamic> map) {
@@ -308,11 +318,11 @@ class ModelDefinition {
 
     // Parse columns
     final columns = <ColumnDefinition>[];
-    
+
     // Add implicit primary key if not defined
     bool hasPrimaryKey = false;
     for (final entry in columnsMap.entries) {
-      final columnData = entry.value is Map<String, dynamic> 
+      final columnData = entry.value is Map<String, dynamic>
           ? entry.value as Map<String, dynamic>
           : SchemaDefinition._convertYamlToMap(entry.value);
       final column = ColumnDefinition.fromMap(entry.key, columnData);
@@ -324,22 +334,24 @@ class ModelDefinition {
 
     // Add implicit id column if no primary key is defined
     if (!hasPrimaryKey) {
-      columns.insert(0, ColumnDefinition(
-        name: 'id',
-        type: ColumnType.integer,
-        constraints: const ColumnConstraints(
-          isPrimary: true,
-          isNull: false,
-          isUnique: true,
-          isIndex: true,
-        ),
-      ));
+      columns.insert(
+          0,
+          ColumnDefinition(
+            name: 'id',
+            type: ColumnType.integer,
+            constraints: const ColumnConstraints(
+              isPrimary: true,
+              isNull: false,
+              isUnique: true,
+              isIndex: true,
+            ),
+          ));
     }
 
     // Parse indexes
     final indexes = <IndexDefinition>[];
     for (final entry in indexesMap.entries) {
-      final indexData = entry.value is Map<String, dynamic> 
+      final indexData = entry.value is Map<String, dynamic>
           ? entry.value as Map<String, dynamic>
           : SchemaDefinition._convertYamlToMap(entry.value);
       final index = IndexDefinition.fromMap(entry.key, indexData);
@@ -356,7 +368,8 @@ class ModelDefinition {
 
   static String _toSnakeCase(String input) {
     return input
-        .replaceAllMapped(RegExp(r'[A-Z]'), (match) => '_${match.group(0)?.toLowerCase()}')
+        .replaceAllMapped(
+            RegExp(r'[A-Z]'), (match) => '_${match.group(0)?.toLowerCase()}')
         .replaceFirst(RegExp(r'^_'), '');
   }
 }
@@ -381,7 +394,7 @@ class SchemaDefinition {
   /// Get relationships between models
   List<RelationshipInfo> get relationships {
     final relationships = <RelationshipInfo>[];
-    
+
     for (final model in models) {
       for (final column in model.columns) {
         if (column.isRelationship && column.relationship != null) {
@@ -395,7 +408,7 @@ class SchemaDefinition {
         }
       }
     }
-    
+
     return relationships;
   }
 
@@ -410,7 +423,7 @@ class SchemaDefinition {
     for (final entry in yaml.entries) {
       final modelName = entry.key as String;
       final modelData = _convertYamlToMap(entry.value);
-      
+
       final model = ModelDefinition.fromMap(modelName, modelData);
       models.add(model);
     }
@@ -477,13 +490,13 @@ class RelationshipInfo {
     this.isManyToMany = false,
   });
 
-  String get junctionTableName => isManyToMany 
-      ? '${_toSnakeCase(fromModel)}_${_toSnakeCase(toModel)}'
-      : '';
+  String get junctionTableName =>
+      isManyToMany ? '${_toSnakeCase(fromModel)}_${_toSnakeCase(toModel)}' : '';
 
   static String _toSnakeCase(String input) {
     return input
-        .replaceAllMapped(RegExp(r'[A-Z]'), (match) => '_${match.group(0)?.toLowerCase()}')
+        .replaceAllMapped(
+            RegExp(r'[A-Z]'), (match) => '_${match.group(0)?.toLowerCase()}')
         .replaceFirst(RegExp(r'^_'), '');
   }
 }
@@ -491,4 +504,4 @@ class RelationshipInfo {
 /// Extension to provide firstOrNull functionality
 extension IterableExtension<T> on Iterable<T> {
   T? get firstOrNull => isEmpty ? null : first;
-} 
+}

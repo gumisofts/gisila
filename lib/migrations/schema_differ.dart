@@ -1,9 +1,16 @@
-/// Schema differ for Gisila ORM
-/// Compares schemas and generates migration operations
+/// Schema differ for gisila: compares two parsed schemas and emits a
+/// list of [SchemaChange]s with paired up/down SQL.
+///
+/// The differ is intentionally heuristic: column renames are detected
+/// only when an old column disappears and a single new column with the
+/// same SQL type and nullability appears in the same table. Anything
+/// more ambiguous is reported as a drop+add and the migration author
+/// is expected to edit the generated SQL by hand.
+library gisila.migrations.schema_differ;
 
 import 'dart:async';
 import 'dart:io';
-import '../generators/schema_parser.dart';
+import 'package:gisila/generators/schema_parser.dart';
 
 /// Types of schema changes
 enum ChangeType {
@@ -206,33 +213,88 @@ class SchemaDiffer {
       newColumns[col.name] = col;
     }
 
-    // Dropped columns
-    for (final oldCol in oldColumns.values) {
-      if (!newColumns.containsKey(oldCol.name)) {
-        final change = SchemaChange(
-          type: ChangeType.dropColumn,
+    // 1. Identify candidate dropped/added columns up-front so we can
+    //    spot rename patterns before falling back to drop+add.
+    final droppedNames =
+        oldColumns.keys.where((n) => !newColumns.containsKey(n)).toList();
+    final addedNames =
+        newColumns.keys.where((n) => !oldColumns.containsKey(n)).toList();
+
+    final renames = <_RenamePair>[];
+    for (final dropped in List<String>.from(droppedNames)) {
+      // A rename match: exactly one added column shares the dropped
+      // column's SQL type AND nullability AND is not already claimed.
+      final candidates = addedNames
+          .where((n) => !renames.any((r) => r.newName == n))
+          .where((n) =>
+              _columnsLookCompatible(oldColumns[dropped]!, newColumns[n]!))
+          .toList();
+      if (candidates.length == 1) {
+        renames.add(_RenamePair(oldName: dropped, newName: candidates.single));
+      }
+    }
+    final renamedOldNames = renames.map((r) => r.oldName).toSet();
+    final renamedNewNames = renames.map((r) => r.newName).toSet();
+
+    // 2. Emit rename ops first so they take precedence over drop+add.
+    for (final r in renames) {
+      final change = SchemaChange(
+        type: ChangeType.renameColumn,
+        tableName: newModel.tableName,
+        oldName: r.oldName,
+        newName: r.newName,
+      );
+      changes.add(change);
+      operations.add(_generateRenameColumnOperation(newModel, r, change));
+    }
+
+    // 3. Real drops (anything that wasn't matched as a rename).
+    for (final dropped in droppedNames) {
+      if (renamedOldNames.contains(dropped)) continue;
+      final oldCol = oldColumns[dropped]!;
+      final change = SchemaChange(
+        type: ChangeType.dropColumn,
+        tableName: newModel.tableName,
+        columnName: dropped,
+      );
+      changes.add(change);
+      operations.add(_generateDropColumnOperation(newModel, oldCol, change));
+      if (oldCol.type == ColumnType.foreignKey) {
+        final fkChange = SchemaChange(
+          type: ChangeType.dropForeignKey,
           tableName: newModel.tableName,
-          columnName: oldCol.name,
+          columnName: dropped,
         );
-        changes.add(change);
-        operations.add(_generateDropColumnOperation(newModel, oldCol, change));
+        changes.add(fkChange);
+        operations
+            .add(_generateDropForeignKeyOperation(newModel, oldCol, fkChange));
       }
     }
 
-    // New columns
-    for (final newCol in newColumns.values) {
-      if (!oldColumns.containsKey(newCol.name)) {
-        final change = SchemaChange(
-          type: ChangeType.addColumn,
+    // 4. Real adds.
+    for (final added in addedNames) {
+      if (renamedNewNames.contains(added)) continue;
+      final newCol = newColumns[added]!;
+      final change = SchemaChange(
+        type: ChangeType.addColumn,
+        tableName: newModel.tableName,
+        columnName: added,
+      );
+      changes.add(change);
+      operations.add(_generateAddColumnOperation(newModel, newCol, change));
+      if (newCol.type == ColumnType.foreignKey) {
+        final fkChange = SchemaChange(
+          type: ChangeType.addForeignKey,
           tableName: newModel.tableName,
-          columnName: newCol.name,
+          columnName: added,
         );
-        changes.add(change);
-        operations.add(_generateAddColumnOperation(newModel, newCol, change));
+        changes.add(fkChange);
+        operations
+            .add(_generateAddForeignKeyOperation(newModel, newCol, fkChange));
       }
     }
 
-    // Modified columns
+    // 5. In-place modifications.
     for (final newCol in newColumns.values) {
       final oldCol = oldColumns[newCol.name];
       if (oldCol != null && _isColumnModified(oldCol, newCol)) {
@@ -250,6 +312,17 @@ class SchemaDiffer {
             _generateModifyColumnOperation(newModel, oldCol, newCol, change));
       }
     }
+  }
+
+  /// Heuristic used by the rename detector. Two columns are
+  /// "compatible" for a rename when they share the same Postgres type
+  /// signature and nullability/uniqueness profile.
+  bool _columnsLookCompatible(ColumnDefinition a, ColumnDefinition b) {
+    if (a.type != b.type) return false;
+    if (a.postgresType != b.postgresType) return false;
+    if (a.constraints.isNull != b.constraints.isNull) return false;
+    if (a.constraints.isPrimary != b.constraints.isPrimary) return false;
+    return true;
   }
 
   /// Compare indexes
@@ -379,21 +452,125 @@ class SchemaDiffer {
     ColumnDefinition newColumn,
     SchemaChange change,
   ) {
-    final newDef = _generateColumnDefinition(newColumn);
-    final oldDef = _generateColumnDefinition(oldColumn);
+    final upStmts = <String>[];
+    final downStmts = <String>[];
 
-    // PostgreSQL style
-    final upSql =
-        'ALTER TABLE ${model.tableName} ALTER COLUMN ${newColumn.name} TYPE ${newColumn.postgresType};';
-    final downSql =
-        'ALTER TABLE ${model.tableName} ALTER COLUMN ${oldColumn.name} TYPE ${oldColumn.postgresType};';
+    if (oldColumn.postgresType != newColumn.postgresType) {
+      upStmts.add(
+        'ALTER TABLE ${model.tableName} ALTER COLUMN ${newColumn.name} '
+        'TYPE ${newColumn.postgresType};',
+      );
+      downStmts.add(
+        'ALTER TABLE ${model.tableName} ALTER COLUMN ${oldColumn.name} '
+        'TYPE ${oldColumn.postgresType};',
+      );
+    }
+    if (oldColumn.constraints.isNull != newColumn.constraints.isNull) {
+      final upClause =
+          newColumn.constraints.isNull ? 'DROP NOT NULL' : 'SET NOT NULL';
+      final downClause =
+          oldColumn.constraints.isNull ? 'DROP NOT NULL' : 'SET NOT NULL';
+      upStmts.add(
+        'ALTER TABLE ${model.tableName} ALTER COLUMN ${newColumn.name} $upClause;',
+      );
+      downStmts.add(
+        'ALTER TABLE ${model.tableName} ALTER COLUMN ${oldColumn.name} $downClause;',
+      );
+    }
+    if (oldColumn.constraints.defaultValue !=
+        newColumn.constraints.defaultValue) {
+      if (newColumn.constraints.defaultValue == null) {
+        upStmts.add(
+          'ALTER TABLE ${model.tableName} ALTER COLUMN ${newColumn.name} DROP DEFAULT;',
+        );
+      } else {
+        upStmts.add(
+          'ALTER TABLE ${model.tableName} ALTER COLUMN ${newColumn.name} '
+          'SET DEFAULT ${newColumn.constraints.defaultValue};',
+        );
+      }
+      if (oldColumn.constraints.defaultValue == null) {
+        downStmts.add(
+          'ALTER TABLE ${model.tableName} ALTER COLUMN ${oldColumn.name} DROP DEFAULT;',
+        );
+      } else {
+        downStmts.add(
+          'ALTER TABLE ${model.tableName} ALTER COLUMN ${oldColumn.name} '
+          'SET DEFAULT ${oldColumn.constraints.defaultValue};',
+        );
+      }
+    }
+
+    // Fall back to a TYPE swap if no specific delta was identified
+    // (paranoid default; should not normally hit).
+    if (upStmts.isEmpty) {
+      upStmts.add(
+        'ALTER TABLE ${model.tableName} ALTER COLUMN ${newColumn.name} '
+        'TYPE ${newColumn.postgresType};',
+      );
+      downStmts.add(
+        'ALTER TABLE ${model.tableName} ALTER COLUMN ${oldColumn.name} '
+        'TYPE ${oldColumn.postgresType};',
+      );
+    }
 
     return MigrationOperation(
-      upSql: upSql,
-      downSql: downSql,
+      upSql: upStmts.join('\n'),
+      downSql: downStmts.reversed.join('\n'),
       change: change,
     );
   }
+
+  MigrationOperation _generateRenameColumnOperation(
+    ModelDefinition model,
+    _RenamePair rename,
+    SchemaChange change,
+  ) {
+    final upSql = 'ALTER TABLE ${model.tableName} '
+        'RENAME COLUMN ${rename.oldName} TO ${rename.newName};';
+    final downSql = 'ALTER TABLE ${model.tableName} '
+        'RENAME COLUMN ${rename.newName} TO ${rename.oldName};';
+    return MigrationOperation(upSql: upSql, downSql: downSql, change: change);
+  }
+
+  MigrationOperation _generateAddForeignKeyOperation(
+    ModelDefinition model,
+    ColumnDefinition column,
+    SchemaChange change,
+  ) {
+    final ref = column.relationship?.references;
+    final targetTable = _toSnake(ref ?? column.name);
+    final fkName = '${model.tableName}_${column.name}_fkey';
+    final upSql = 'ALTER TABLE ${model.tableName} '
+        'ADD CONSTRAINT $fkName '
+        'FOREIGN KEY (${column.name}_id) REFERENCES $targetTable (id) '
+        'ON DELETE SET NULL ON UPDATE CASCADE;';
+    final downSql =
+        'ALTER TABLE ${model.tableName} DROP CONSTRAINT IF EXISTS $fkName;';
+    return MigrationOperation(upSql: upSql, downSql: downSql, change: change);
+  }
+
+  MigrationOperation _generateDropForeignKeyOperation(
+    ModelDefinition model,
+    ColumnDefinition column,
+    SchemaChange change,
+  ) {
+    final ref = column.relationship?.references;
+    final targetTable = _toSnake(ref ?? column.name);
+    final fkName = '${model.tableName}_${column.name}_fkey';
+    final upSql =
+        'ALTER TABLE ${model.tableName} DROP CONSTRAINT IF EXISTS $fkName;';
+    final downSql = 'ALTER TABLE ${model.tableName} '
+        'ADD CONSTRAINT $fkName '
+        'FOREIGN KEY (${column.name}_id) REFERENCES $targetTable (id) '
+        'ON DELETE SET NULL ON UPDATE CASCADE;';
+    return MigrationOperation(upSql: upSql, downSql: downSql, change: change);
+  }
+
+  String _toSnake(String s) => s
+      .replaceAllMapped(
+          RegExp(r'[A-Z]'), (m) => '_${m.group(0)!.toLowerCase()}')
+      .replaceFirst(RegExp(r'^_'), '');
 
   MigrationOperation _generateAddIndexOperation(
       ModelDefinition model, IndexDefinition index, SchemaChange change) {
@@ -523,8 +700,15 @@ class SchemaDiffer {
     await upFile.writeAsString(upBuffer.toString());
     await downFile.writeAsString(downBuffer.toString());
 
-    print('✅ Generated migration files:');
+    print('Generated migration files:');
     print('   Up:   ${upFile.path}');
     print('   Down: ${downFile.path}');
   }
+}
+
+/// Internal pairing used while detecting renames.
+class _RenamePair {
+  final String oldName;
+  final String newName;
+  const _RenamePair({required this.oldName, required this.newName});
 }

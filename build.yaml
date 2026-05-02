@@ -1,16 +1,29 @@
 targets:
   $default:
     builders:
-      pg_dorm:modelFromYamlGen:
+      gisila|schemaBuilder:
         generate_for:
           include:
-            - lib/models/**
-            - test/models/**
+            - lib/**.gisila.yaml
+            - lib/**.gisila.yml
+            - test/**.gisila.yaml
+            - test/**.gisila.yml
+            - example/**.gisila.yaml
+            - example/**.gisila.yml
         enabled: true
+
 builders:
-  modelFromYamlGen:
-    import: "package:pg_dorm/generators/builders.dart"
-    builder_factories: ["modelFromYamlBuilder"]
-    build_extensions: { ".yml": [".dart"], "yaml": [".dart"] }
+  schemaBuilder:
+    import: "package:gisila/generators/schema_builder.dart"
+    builder_factories: ["schemaBuilder"]
+    build_extensions:
+      ".gisila.yaml":
+        - ".gisila.g.dart"
+        - ".gisila.up.sql"
+        - ".gisila.down.sql"
+      ".gisila.yml":
+        - ".gisila.g.dart"
+        - ".gisila.up.sql"
+        - ".gisila.down.sql"
     auto_apply: dependents
     build_to: source

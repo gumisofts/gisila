@@ -1,0 +1,87 @@
+// General Guidelines
+- The ORM should be written in Dart, targeting full type-safety.
+- Use `postgres` package or FFI bindings to PostgreSQL.
+- Structure code to support multiple databases in the future (extensibility).
+
+// Schema Definition
+- Define models using a DSL or YAML/JSON format that generates Dart code.
+- Each model must be converted into:
+  - A Dart class
+  - SQL table creation script
+  - Repository (for CRUD ops)
+
+// Type Mapping
+- Ensure accurate Dart ↔ PostgreSQL type mapping:
+  - `int` ↔ `INTEGER`, `BIGINT`
+  - `double` ↔ `REAL`, `FLOAT`
+  - `String` ↔ `TEXT`, `VARCHAR`
+  - `bool` ↔ `BOOLEAN`
+  - `DateTime` ↔ `TIMESTAMP`
+  - `List<T>` ↔ `ARRAY`
+  - `Map<String, dynamic>` ↔ `JSON`
+  - `do the same for other types too`
+
+// Code Generation Rules
+- Generate Dart model classes from schema.
+- Each model should have:
+  - Fields with correct Dart types
+  - `fromRow` and `toRow` methods for mapping to/from database rows
+  - Serialization support (toMap, fromMap, JSON)
+
+// Query Builder
+- Provide a fluent query builder that:
+  - Supports filtering (`where`), pagination (`limit`, `offset`), and joins
+  - Is SQL-injection safe
+  - Supports prepared statements
+
+// Migrations
+- Generate migration scripts when schema changes
+- Support `up` and `down` operations
+
+// Connection Handling
+- Use a connection pool
+- Provide async-safe operations with `Future` and `Stream` where applicable
+
+// Error Handling
+- Wrap PostgreSQL exceptions into custom Dart errors
+- Fail gracefully with meaningful messages
+
+// Naming Conventions
+- Use snake_case for SQL and camelCase for Dart
+- Allow custom table and field names via annotations or metadata
+
+// Custom Annotations
+- Allow `@PrimaryKey`, `@ForeignKey`, `@Unique`, etc.
+- Use `meta` package to define these if needed
+
+// Testing
+- Include mock adapters for unit testing
+- Allow in-memory PostgreSQL (e.g., test containers or mock drivers)
+
+// Example Code Style
+class User {
+  final int id;
+  final String name;
+  final DateTime createdAt;
+
+  User({required this.id, required this.name, required this.createdAt});
+
+  factory User.fromRow(Row row) {
+    return User(
+      id: row['id'] as int,
+      name: row['name'] as String,
+      createdAt: row['created_at'] as DateTime,
+    );
+  }
+
+  Map<String, dynamic> toRow() {
+    return {
+      'id': id,
+      'name': name,
+      'created_at': createdAt.toIso8601String(),
+    };
+  }
+}
+
+// Target Usage Example
+final users = await db.users.where((u) => u.name.like('%john%')).get();

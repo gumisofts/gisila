@@ -1,69 +1,71 @@
-/// Database configuration handler for Gisila ORM
+/// Database configuration handler for Gisila ORM.
 ///
-/// Supports multiple database connections with environment-based configuration
-/// and connection pooling capabilities.
+/// Loads PostgreSQL connection settings from YAML files, environment
+/// variables, or programmatically. Pool lifecycle is owned by
+/// [Database] in `lib/database/postgres/core/connections.dart`; this
+/// file only exposes the configuration values that drive it.
 library gisila.config;
 
 import 'dart:io';
-import 'package:yaml/yaml.dart';
-import 'connection_pool.dart';
 
-/// Supported database types
+import 'package:yaml/yaml.dart';
+
+/// Supported database types. Phase 1 of gisila ships PostgreSQL only;
+/// the enum is preserved for forward-compatibility with later backends.
 enum DatabaseType {
   postgresql,
-  sqlite,
-  mysql,
 }
 
-/// Database connection configuration
+/// Configuration for a single named database connection.
 class DatabaseConnection {
-  /// Connection identifier
+  /// Connection identifier (used as the lookup name in [DatabaseConfig]).
   final String name;
 
-  /// Database type
+  /// Database backend type.
   final DatabaseType type;
 
-  /// Database host (not used for SQLite)
-  final String? host;
+  /// Database server host.
+  final String host;
 
-  /// Database port (not used for SQLite)
-  final int? port;
+  /// Database server port.
+  final int port;
 
-  /// Database name or file path for SQLite
+  /// Database name on the server.
   final String database;
 
-  /// Username (not used for SQLite)
-  final String? username;
+  /// Username for authentication.
+  final String username;
 
-  /// Password (not used for SQLite)
-  final String? password;
+  /// Password for authentication.
+  final String password;
 
-  /// SSL mode for PostgreSQL
+  /// Whether to require SSL.
   final bool useSSL;
 
-  /// Connection timeout in seconds
+  /// Connection establishment timeout in seconds.
   final int connectionTimeout;
 
-  /// Query timeout in seconds
+  /// Per-query timeout in seconds.
   final int queryTimeout;
 
-  /// Maximum number of connections in pool
+  /// Upper bound on simultaneous physical connections in the pool.
   final int maxConnections;
 
-  /// Minimum number of connections in pool
+  /// Lower bound on connections kept warm in the pool.
   final int minConnections;
 
-  /// Additional connection parameters
+  /// Backend-specific extra parameters (e.g. `application_name`,
+  /// `search_path`). Forwarded into pool settings where applicable.
   final Map<String, dynamic> additionalParams;
 
   const DatabaseConnection({
     required this.name,
     required this.type,
+    required this.host,
+    required this.port,
     required this.database,
-    this.host,
-    this.port,
-    this.username,
-    this.password,
+    required this.username,
+    required this.password,
     this.useSSL = false,
     this.connectionTimeout = 30,
     this.queryTimeout = 30,
@@ -72,7 +74,7 @@ class DatabaseConnection {
     this.additionalParams = const {},
   });
 
-  /// Create PostgreSQL connection configuration
+  /// Convenience factory for PostgreSQL.
   factory DatabaseConnection.postgresql({
     required String name,
     required String host,
@@ -86,157 +88,89 @@ class DatabaseConnection {
     int maxConnections = 10,
     int minConnections = 2,
     Map<String, dynamic> additionalParams = const {},
-  }) {
-    return DatabaseConnection(
-      name: name,
-      type: DatabaseType.postgresql,
-      host: host,
-      port: port,
-      database: database,
-      username: username,
-      password: password,
-      useSSL: useSSL,
-      connectionTimeout: connectionTimeout,
-      queryTimeout: queryTimeout,
-      maxConnections: maxConnections,
-      minConnections: minConnections,
-      additionalParams: additionalParams,
-    );
-  }
+  }) =>
+      DatabaseConnection(
+        name: name,
+        type: DatabaseType.postgresql,
+        host: host,
+        port: port,
+        database: database,
+        username: username,
+        password: password,
+        useSSL: useSSL,
+        connectionTimeout: connectionTimeout,
+        queryTimeout: queryTimeout,
+        maxConnections: maxConnections,
+        minConnections: minConnections,
+        additionalParams: additionalParams,
+      );
 
-  /// Create SQLite connection configuration
-  factory DatabaseConnection.sqlite({
-    required String name,
-    required String database,
-    int connectionTimeout = 30,
-    int queryTimeout = 30,
-    int maxConnections = 1,
-    int minConnections = 1,
-    Map<String, dynamic> additionalParams = const {},
-  }) {
-    return DatabaseConnection(
-      name: name,
-      type: DatabaseType.sqlite,
-      database: database,
-      connectionTimeout: connectionTimeout,
-      queryTimeout: queryTimeout,
-      maxConnections: maxConnections,
-      minConnections: minConnections,
-      additionalParams: additionalParams,
-    );
-  }
-
-  /// Create MySQL connection configuration
-  factory DatabaseConnection.mysql({
-    required String name,
-    required String host,
-    required String database,
-    required String username,
-    required String password,
-    int port = 3306,
-    bool useSSL = false,
-    int connectionTimeout = 30,
-    int queryTimeout = 30,
-    int maxConnections = 10,
-    int minConnections = 2,
-    Map<String, dynamic> additionalParams = const {},
-  }) {
-    return DatabaseConnection(
-      name: name,
-      type: DatabaseType.mysql,
-      host: host,
-      port: port,
-      database: database,
-      username: username,
-      password: password,
-      useSSL: useSSL,
-      connectionTimeout: connectionTimeout,
-      queryTimeout: queryTimeout,
-      maxConnections: maxConnections,
-      minConnections: minConnections,
-      additionalParams: additionalParams,
-    );
-  }
-
-  /// Create connection configuration from map
+  /// Parse a YAML/JSON-style map into a [DatabaseConnection].
   factory DatabaseConnection.fromMap(String name, Map<String, dynamic> config) {
-    final typeStr = config['type'] as String;
+    final typeStr = (config['type'] as String?) ?? 'postgresql';
     final type = DatabaseType.values.firstWhere(
-      (e) => e.toString().split('.').last == typeStr,
+      (e) => e.name == typeStr,
       orElse: () => throw ArgumentError('Unsupported database type: $typeStr'),
     );
 
     return DatabaseConnection(
       name: name,
       type: type,
-      host: config['host'] as String?,
-      port: config['port'] as int?,
+      host: (config['host'] as String?) ?? 'localhost',
+      port: (config['port'] as int?) ?? 5432,
       database: config['database'] as String,
-      username: config['username'] as String?,
-      password: config['password'] as String?,
-      useSSL: config['ssl'] as bool? ?? false,
-      connectionTimeout: config['connection_timeout'] as int? ?? 30,
-      queryTimeout: config['query_timeout'] as int? ?? 30,
-      maxConnections: config['max_connections'] as int? ?? 10,
-      minConnections: config['min_connections'] as int? ?? 2,
+      username: (config['username'] as String?) ?? 'postgres',
+      password: (config['password'] as String?) ?? '',
+      useSSL: (config['ssl'] as bool?) ?? false,
+      connectionTimeout: (config['connection_timeout'] as int?) ?? 30,
+      queryTimeout: (config['query_timeout'] as int?) ?? 30,
+      maxConnections: (config['max_connections'] as int?) ?? 10,
+      minConnections: (config['min_connections'] as int?) ?? 2,
       additionalParams:
-          config['additional_params'] as Map<String, dynamic>? ?? {},
+          (config['additional_params'] as Map?)?.cast<String, dynamic>() ??
+              const {},
     );
   }
 
-  /// Convert to map for serialization
+  /// Serialize the connection back to a map (for round-tripping configs).
   Map<String, dynamic> toMap() {
     final map = <String, dynamic>{
-      'type': type.toString().split('.').last,
+      'type': type.name,
+      'host': host,
+      'port': port,
       'database': database,
+      'username': username,
+      'password': password,
       'connection_timeout': connectionTimeout,
       'query_timeout': queryTimeout,
       'max_connections': maxConnections,
       'min_connections': minConnections,
     };
 
-    if (host != null) map['host'] = host;
-    if (port != null) map['port'] = port;
-    if (username != null) map['username'] = username;
-    if (password != null) map['password'] = password;
     if (useSSL) map['ssl'] = useSSL;
-    if (additionalParams.isNotEmpty)
+    if (additionalParams.isNotEmpty) {
       map['additional_params'] = additionalParams;
+    }
 
     return map;
   }
 
-  /// Generate connection string for the database
+  /// Standard connection-string form (handy for logging or libpq tools).
   String get connectionString {
-    switch (type) {
-      case DatabaseType.postgresql:
-        final ssl = useSSL ? '?sslmode=require' : '';
-        return 'postgresql://$username:$password@$host:$port/$database$ssl';
-
-      case DatabaseType.mysql:
-        final ssl = useSSL ? '?useSSL=true' : '';
-        return 'mysql://$username:$password@$host:$port/$database$ssl';
-
-      case DatabaseType.sqlite:
-        return 'sqlite:///$database';
-    }
+    final ssl = useSSL ? '?sslmode=require' : '';
+    return 'postgresql://$username:$password@$host:$port/$database$ssl';
   }
 
   @override
-  String toString() {
-    return 'DatabaseConnection(name: $name, type: $type, database: $database)';
-  }
+  String toString() =>
+      'DatabaseConnection(name: $name, type: ${type.name}, database: $database)';
 }
 
-/// Main database configuration manager
+/// Aggregate of named [DatabaseConnection]s, with one designated default.
 class DatabaseConfig {
-  /// Map of database connections by name
   final Map<String, DatabaseConnection> _connections = {};
+  String _defaultConnection;
 
-  /// Default connection name
-  String _defaultConnection = 'default';
-
-  /// Create database configuration
   DatabaseConfig({
     List<DatabaseConnection> connections = const [],
     String defaultConnection = 'default',
@@ -246,133 +180,118 @@ class DatabaseConfig {
     }
   }
 
-  /// Load configuration from YAML file
+  /// Load configuration from a YAML file.
   static Future<DatabaseConfig> fromFile(String filePath) async {
     final file = File(filePath);
     if (!await file.exists()) {
       throw FileSystemException('Database config file not found: $filePath');
     }
-
-    final content = await file.readAsString();
-    final yaml = loadYaml(content) as Map;
-
-    return DatabaseConfig.fromMap(yaml);
+    final yaml = loadYaml(await file.readAsString());
+    return DatabaseConfig.fromMap(_yamlToMap(yaml) as Map<String, dynamic>);
   }
 
-  /// Create configuration from map
-  static DatabaseConfig fromMap(Map<dynamic, dynamic> config) {
+  /// Build a configuration from a parsed map.
+  static DatabaseConfig fromMap(Map<String, dynamic> config) {
     final connections = <DatabaseConnection>[];
     final connectionsMap =
-        config['connections'] as Map<dynamic, dynamic>? ?? {};
+        (config['connections'] as Map?)?.cast<String, dynamic>() ?? const {};
 
     for (final entry in connectionsMap.entries) {
-      final name = entry.key as String;
-      final connectionConfig = entry.value as Map<dynamic, dynamic>;
-      connections.add(DatabaseConnection.fromMap(
-          name, connectionConfig.cast<String, dynamic>()));
+      connections.add(
+        DatabaseConnection.fromMap(
+          entry.key,
+          (entry.value as Map).cast<String, dynamic>(),
+        ),
+      );
     }
-
-    final defaultConnection = config['default'] as String? ?? 'default';
 
     return DatabaseConfig(
       connections: connections,
-      defaultConnection: defaultConnection,
+      defaultConnection: (config['default'] as String?) ?? 'default',
     );
   }
 
-  /// Load configuration with environment variable support
+  /// Load configuration with environment-variable overrides.
+  ///
+  /// `DATABASE_URL` provides the default connection. `DB_CONNECTIONS`
+  /// is a comma-separated list of names; each `DB_<NAME>_URL` provides
+  /// the URL for that named connection.
   static Future<DatabaseConfig> fromEnvironment({
     String configFile = 'database.yaml',
     Map<String, String>? envOverrides,
   }) async {
     final env = envOverrides ?? Platform.environment;
 
-    // Try to load from file first
     DatabaseConfig config;
     final file = File(configFile);
-
     if (await file.exists()) {
       config = await DatabaseConfig.fromFile(configFile);
     } else {
       config = DatabaseConfig();
     }
 
-    // Override with environment variables
-    config._loadFromEnvironment(env);
+    final defaultUrl = env['DATABASE_URL'];
+    if (defaultUrl != null) {
+      config._connections['default'] =
+          _parseConnectionString('default', defaultUrl);
+      config._defaultConnection = 'default';
+    }
+
+    final names = env['DB_CONNECTIONS']?.split(',') ?? const <String>[];
+    for (final raw in names) {
+      final name = raw.trim();
+      if (name.isEmpty) continue;
+      final url = env['DB_${name.toUpperCase()}_URL'];
+      if (url != null) {
+        config._connections[name] = _parseConnectionString(name, url);
+      }
+    }
 
     return config;
   }
 
-  /// Load configuration from environment variables
-  void _loadFromEnvironment(Map<String, String> env) {
-    // Load default connection from environment
-    final dbUrl = env['DATABASE_URL'];
-    if (dbUrl != null) {
-      final connection = _parseConnectionString('default', dbUrl);
-      _connections['default'] = connection;
-    }
-
-    // Load additional connections
-    final connectionNames = env['DB_CONNECTIONS']?.split(',') ?? [];
-    for (final name in connectionNames) {
-      final prefix = 'DB_${name.toUpperCase()}';
-      final url = env['${prefix}_URL'];
-
-      if (url != null) {
-        final connection = _parseConnectionString(name.trim(), url);
-        _connections[name.trim()] = connection;
-      }
-    }
-  }
-
-  /// Parse connection string into DatabaseConnection
-  DatabaseConnection _parseConnectionString(
-      String name, String connectionString) {
+  static DatabaseConnection _parseConnectionString(
+    String name,
+    String connectionString,
+  ) {
     final uri = Uri.parse(connectionString);
-
-    DatabaseType type;
-    switch (uri.scheme) {
-      case 'postgresql':
-      case 'postgres':
-        type = DatabaseType.postgresql;
-        break;
-      case 'mysql':
-        type = DatabaseType.mysql;
-        break;
-      case 'sqlite':
-        type = DatabaseType.sqlite;
-        break;
-      default:
-        throw ArgumentError('Unsupported database scheme: ${uri.scheme}');
+    if (uri.scheme != 'postgresql' && uri.scheme != 'postgres') {
+      throw ArgumentError('Unsupported database scheme: ${uri.scheme}');
     }
 
-    if (type == DatabaseType.sqlite) {
-      return DatabaseConnection.sqlite(
-        name: name,
-        database: uri.path,
-      );
-    }
-
+    final userInfo = uri.userInfo.split(':');
     return DatabaseConnection(
       name: name,
-      type: type,
-      host: uri.host,
-      port: uri.port,
+      type: DatabaseType.postgresql,
+      host: uri.host.isEmpty ? 'localhost' : uri.host,
+      port: uri.hasPort ? uri.port : 5432,
       database: uri.pathSegments.isNotEmpty ? uri.pathSegments.first : '',
-      username: uri.userInfo.isNotEmpty ? uri.userInfo.split(':').first : null,
-      password:
-          uri.userInfo.contains(':') ? uri.userInfo.split(':').last : null,
-      useSSL: uri.queryParameters.containsKey('sslmode') ||
-          uri.queryParameters.containsKey('useSSL'),
+      username: userInfo.isNotEmpty ? userInfo.first : 'postgres',
+      password: userInfo.length > 1 ? userInfo.last : '',
+      useSSL: uri.queryParameters['sslmode'] == 'require',
     );
   }
 
-  /// Add a database connection
+  /// Recursively convert a YamlMap/YamlList tree into plain Dart maps/lists.
+  static dynamic _yamlToMap(dynamic yaml) {
+    if (yaml is YamlMap) {
+      return {
+        for (final entry in yaml.entries)
+          entry.key.toString(): _yamlToMap(entry.value),
+      };
+    }
+    if (yaml is YamlList) {
+      return yaml.map(_yamlToMap).toList();
+    }
+    return yaml;
+  }
+
+  /// Register or replace a named connection.
   void addConnection(DatabaseConnection connection) {
     _connections[connection.name] = connection;
   }
 
-  /// Remove a database connection
+  /// Remove a named connection. The current default cannot be removed.
   void removeConnection(String name) {
     if (name == _defaultConnection) {
       throw ArgumentError('Cannot remove the default connection');
@@ -380,13 +299,11 @@ class DatabaseConfig {
     _connections.remove(name);
   }
 
-  /// Get a database connection by name
-  DatabaseConnection? getConnection([String? name]) {
-    final connectionName = name ?? _defaultConnection;
-    return _connections[connectionName];
-  }
+  /// Look up a connection by name (defaults to the default connection).
+  DatabaseConnection? getConnection([String? name]) =>
+      _connections[name ?? _defaultConnection];
 
-  /// Get the default database connection
+  /// Get the default connection or throw if it has not been registered.
   DatabaseConnection get defaultConnection {
     final connection = _connections[_defaultConnection];
     if (connection == null) {
@@ -395,7 +312,7 @@ class DatabaseConfig {
     return connection;
   }
 
-  /// Set the default connection
+  /// Switch the default connection name.
   void setDefaultConnection(String name) {
     if (!_connections.containsKey(name)) {
       throw ArgumentError('Connection "$name" does not exist');
@@ -403,208 +320,22 @@ class DatabaseConfig {
     _defaultConnection = name;
   }
 
-  /// Get all connection names
+  /// Names of all registered connections.
   List<String> get connectionNames => _connections.keys.toList();
 
-  /// Check if a connection exists
+  /// Whether a connection with the given name exists.
   bool hasConnection(String name) => _connections.containsKey(name);
 
-  /// Get all connections
+  /// Read-only view of all connections.
   Map<String, DatabaseConnection> get connections =>
       Map.unmodifiable(_connections);
 
-  /// Export configuration to map
-  Map<String, dynamic> toMap() {
-    return {
-      'default': _defaultConnection,
-      'connections': _connections
-          .map((name, connection) => MapEntry(name, connection.toMap())),
-    };
-  }
-
-  /// Export configuration to YAML string
-  String toYamlString() {
-    final buffer = StringBuffer();
-    buffer.writeln('# Gisila Database Configuration');
-    buffer.writeln('default: $_defaultConnection');
-    buffer.writeln();
-    buffer.writeln('connections:');
-
-    for (final entry in _connections.entries) {
-      final name = entry.key;
-      final connection = entry.value;
-
-      buffer.writeln('  $name:');
-      buffer.writeln('    type: ${connection.type.toString().split('.').last}');
-
-      if (connection.host != null) {
-        buffer.writeln('    host: ${connection.host}');
-      }
-      if (connection.port != null) {
-        buffer.writeln('    port: ${connection.port}');
-      }
-
-      buffer.writeln('    database: ${connection.database}');
-
-      if (connection.username != null) {
-        buffer.writeln('    username: ${connection.username}');
-      }
-      if (connection.password != null) {
-        buffer.writeln('    password: ${connection.password}');
-      }
-
-      if (connection.useSSL) {
-        buffer.writeln('    ssl: true');
-      }
-
-      buffer.writeln('    connection_timeout: ${connection.connectionTimeout}');
-      buffer.writeln('    query_timeout: ${connection.queryTimeout}');
-      buffer.writeln('    max_connections: ${connection.maxConnections}');
-      buffer.writeln('    min_connections: ${connection.minConnections}');
-
-      if (connection.additionalParams.isNotEmpty) {
-        buffer.writeln('    additional_params:');
-        for (final param in connection.additionalParams.entries) {
-          buffer.writeln('      ${param.key}: ${param.value}');
-        }
-      }
-
-      buffer.writeln();
-    }
-
-    return buffer.toString();
-  }
-
-  /// Save configuration to file
-  Future<void> saveToFile(String filePath) async {
-    final file = File(filePath);
-    await file.writeAsString(toYamlString());
-  }
-
-  /// Get connection pool for a specific connection
-  /// This method creates a new pool each time it's called
-  /// For production use, consider implementing a pool manager
-  Future<ConnectionPool<dynamic>> getConnectionPool(
-      [String? connectionName]) async {
-    final connection = getConnection(connectionName);
-    if (connection == null) {
-      final name = connectionName ?? _defaultConnection;
-      throw StateError('Connection "$name" not found');
-    }
-
-    // Create a simple connection factory for this connection
-    final factory = SimpleConnectionFactory();
-
-    final pool = ConnectionPool<dynamic>(
-      config: connection,
-      factory: factory,
-    );
-
-    await pool.initialize();
-    return pool;
-  }
-}
-
-/// Simple connection factory implementation
-/// This is a basic implementation for the migration system
-class SimpleConnectionFactory implements ConnectionFactory<dynamic> {
-  @override
-  Future<dynamic> createConnection(DatabaseConnection config) async {
-    // This is a placeholder implementation
-    // In a real implementation, this would create actual database connections
-    // using the appropriate database driver (postgresql, mysql, sqlite)
-    return SimpleConnection(config);
-  }
-
-  @override
-  Future<void> closeConnection(dynamic connection) async {
-    if (connection is SimpleConnection) {
-      await connection.close();
-    }
-  }
-
-  @override
-  Future<bool> isConnectionHealthy(dynamic connection) async {
-    if (connection is SimpleConnection) {
-      return connection.isHealthy;
-    }
-    return false;
-  }
-
-  @override
-  Future<void> resetConnection(dynamic connection) async {
-    if (connection is SimpleConnection) {
-      await connection.reset();
-    }
-  }
-}
-
-/// Simple connection implementation for migration system
-class SimpleConnection {
-  final DatabaseConnection config;
-  bool _closed = false;
-
-  SimpleConnection(this.config);
-
-  bool get isHealthy => !_closed;
-
-  Future<List<Map<String, dynamic>>> query(String sql,
-      [List<dynamic>? parameters]) async {
-    if (_closed) throw StateError('Connection is closed');
-
-    // This is a placeholder implementation
-    // In a real implementation, this would execute the SQL query
-    // against the actual database using the appropriate driver
-
-    // For migration tracking table queries, return empty results
-    if (sql.contains('gisila_migrations')) {
-      return [];
-    }
-
-    throw UnimplementedError(
-        'SimpleConnection.query() needs database driver implementation');
-  }
-
-  Future<void> execute(String sql, [List<dynamic>? parameters]) async {
-    if (_closed) throw StateError('Connection is closed');
-
-    // This is a placeholder implementation
-    // In a real implementation, this would execute the SQL statement
-    // against the actual database using the appropriate driver
-
-    print('Executing SQL: $sql');
-    if (parameters != null && parameters.isNotEmpty) {
-      print('Parameters: $parameters');
-    }
-  }
-
-  Future<T> transaction<T>(Future<T> Function() action) async {
-    if (_closed) throw StateError('Connection is closed');
-
-    // This is a placeholder implementation
-    // In a real implementation, this would handle database transactions
-
-    print('Starting transaction');
-    try {
-      final result = await action();
-      print('Committing transaction');
-      return result;
-    } catch (e) {
-      print('Rolling back transaction: $e');
-      rethrow;
-    }
-  }
-
-  Future<void> close() async {
-    _closed = true;
-    print('Connection closed');
-  }
-
-  Future<void> reset() async {
-    if (_closed) throw StateError('Connection is closed');
-
-    // This is a placeholder implementation
-    // In a real implementation, this would reset the connection state
-    print('Connection reset');
-  }
+  /// Serialize the whole configuration to a map.
+  Map<String, dynamic> toMap() => {
+        'default': _defaultConnection,
+        'connections': {
+          for (final entry in _connections.entries)
+            entry.key: entry.value.toMap(),
+        },
+      };
 }

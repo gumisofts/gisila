@@ -1,489 +1,232 @@
-/// Migration manager for Gisila ORM
-/// Handles applying and rolling back database schema changes safely
+/// Runtime executor for gisila migrations.
+///
+/// A [MigrationManager] discovers `*.up.sql` / `*.down.sql` pairs on
+/// disk, tracks which ones have been applied via the
+/// `gisila_migrations` table, and can apply or roll back a batch
+/// transactionally through a [Database].
+library gisila.migrations.migration_manager;
 
 import 'dart:async';
 import 'dart:io';
-import 'package:path/path.dart' as path;
-import 'package:gisila/config/config.dart';
 
-/// Represents a single migration file
+import 'package:gisila/database/postgres/core/connections.dart';
+
+/// One discovered migration on disk: an up SQL plus an optional down
+/// SQL with the same prefix.
 class Migration {
+  /// Stable identifier, normally the file's base name (e.g.
+  /// `20260101_create_users` or `blog.gisila`).
   final String id;
-  final String name;
-  final String upFile;
-  final String downFile;
-  final DateTime timestamp;
+
+  /// SQL applied when migrating up. Typically multi-statement.
+  final String upSql;
+
+  /// SQL applied when rolling back. May be empty if no down SQL was
+  /// provided alongside the up file.
+  final String downSql;
+
+  /// Source path of the up SQL file (informational).
+  final String? sourcePath;
 
   const Migration({
     required this.id,
-    required this.name,
-    required this.upFile,
-    required this.downFile,
-    required this.timestamp,
+    required this.upSql,
+    this.downSql = '',
+    this.sourcePath,
   });
-
-  /// Parse migration from filename
-  factory Migration.fromFile(String upFilePath) {
-    final fileName = path.basenameWithoutExtension(upFilePath);
-    final parts = fileName.split('_');
-
-    if (parts.length < 2) {
-      throw ArgumentError('Invalid migration filename: $fileName');
-    }
-
-    final timestampStr = parts[0];
-    final name = parts.sublist(1).join('_');
-
-    final timestamp =
-        DateTime.fromMillisecondsSinceEpoch(int.parse(timestampStr));
-    final downFile = upFilePath.replaceAll('.sql', '.down.sql');
-
-    return Migration(
-      id: timestampStr,
-      name: name,
-      upFile: upFilePath,
-      downFile: downFile,
-      timestamp: timestamp,
-    );
-  }
-
-  @override
-  String toString() => '$id: $name';
 }
 
-/// Migration execution result
+/// One row from `gisila_migrations` describing a previously applied
+/// migration.
+class AppliedMigration {
+  final String id;
+  final DateTime appliedAt;
+  final int batch;
+
+  const AppliedMigration({
+    required this.id,
+    required this.appliedAt,
+    required this.batch,
+  });
+}
+
+/// Outcome returned by [MigrationManager.up] / [MigrationManager.down].
 class MigrationResult {
-  final bool success;
-  final String? error;
-  final Duration duration;
-  final String migrationId;
+  final List<Migration> applied;
+  final List<Migration> rolledBack;
+  final int batch;
 
   const MigrationResult({
-    required this.success,
-    required this.duration,
-    required this.migrationId,
-    this.error,
-  });
-
-  factory MigrationResult.success(String migrationId, Duration duration) {
-    return MigrationResult(
-      success: true,
-      duration: duration,
-      migrationId: migrationId,
-    );
-  }
-
-  factory MigrationResult.failure(
-      String migrationId, Duration duration, String error) {
-    return MigrationResult(
-      success: false,
-      duration: duration,
-      migrationId: migrationId,
-      error: error,
-    );
-  }
-}
-
-/// Options for migration execution
-class MigrationOptions {
-  final bool dryRun;
-  final bool createBackup;
-  final bool verbose;
-  final bool force;
-  final String? connectionName;
-
-  const MigrationOptions({
-    this.dryRun = false,
-    this.createBackup = true,
-    this.verbose = false,
-    this.force = false,
-    this.connectionName,
+    this.applied = const [],
+    this.rolledBack = const [],
+    this.batch = 0,
   });
 }
 
-/// Exception thrown during migration operations
-class MigrationException implements Exception {
-  final String message;
-  final String? migrationId;
-
-  const MigrationException(this.message, [this.migrationId]);
-
-  @override
-  String toString() =>
-      'MigrationException: $message${migrationId != null ? ' (Migration: $migrationId)' : ''}';
-}
-
-/// Main migration manager class
 class MigrationManager {
-  static const String _migrationsTable = 'gisila_migrations';
-  final DatabaseConfig _dbConfig;
-  final String _migrationsPath;
+  final Database _db;
+  final String _trackingTable;
 
-  MigrationManager(this._dbConfig, this._migrationsPath);
+  /// Build a manager that talks to [database] and tracks state in the
+  /// configured [trackingTable] (default `gisila_migrations`).
+  MigrationManager(
+    Database database, {
+    String trackingTable = 'gisila_migrations',
+  })  : _db = database,
+        _trackingTable = trackingTable;
 
-  /// Initialize migration system
-  Future<void> initialize({String? connectionName}) async {
-    await _ensureMigrationsTable(connectionName: connectionName);
+  /// Ensure the tracking table exists. Idempotent.
+  ///
+  /// Uses `BIGSERIAL PRIMARY KEY` (Postgres-native) and `$n`
+  /// placeholders throughout - no SQLite-style SQL leaks here.
+  Future<void> ensureSchema() async {
+    final sql = '''
+      CREATE TABLE IF NOT EXISTS "$_trackingTable" (
+        "id"         BIGSERIAL PRIMARY KEY,
+        "migration"  VARCHAR(255) NOT NULL UNIQUE,
+        "batch"      INTEGER      NOT NULL,
+        "applied_at" TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    ''';
+    await _db.execute(sql);
   }
 
-  /// Get all migration files from directory
-  Future<List<Migration>> _loadMigrationFiles() async {
-    final migrationsDir = Directory(_migrationsPath);
+  /// Read every applied migration, oldest-first.
+  Future<List<AppliedMigration>> listApplied() async {
+    await ensureSchema();
+    final rows = await _db.execute(
+      'SELECT "migration", "applied_at", "batch" FROM "$_trackingTable" '
+      'ORDER BY "id" ASC',
+    );
+    return [
+      for (final row in rows)
+        AppliedMigration(
+          id: row.toColumnMap()['migration'] as String,
+          appliedAt: row.toColumnMap()['applied_at'] as DateTime,
+          batch: row.toColumnMap()['batch'] as int,
+        ),
+    ];
+  }
 
-    if (!await migrationsDir.exists()) {
-      throw MigrationException(
-          'Migrations directory not found: $_migrationsPath');
+  /// Discover all migrations in [directory]. Files ending in
+  /// `.up.sql` are paired with same-prefix `.down.sql` files.
+  Future<List<Migration>> discoverIn(String directory) async {
+    final dir = Directory(directory);
+    if (!await dir.exists()) {
+      throw FileSystemException('Migrations directory not found', directory);
     }
+    final entries = await dir.list(recursive: true).toList();
+    final files = entries.whereType<File>().toList()
+      ..sort((a, b) => a.path.compareTo(b.path));
 
-    final files = await migrationsDir
-        .list()
-        .where((entity) =>
-            entity is File &&
-            entity.path.endsWith('.sql') &&
-            !entity.path.endsWith('.down.sql'))
-        .cast<File>()
-        .toList();
-
-    final migrations = <Migration>[];
-    for (final file in files) {
-      try {
-        final migration = Migration.fromFile(file.path);
-        migrations.add(migration);
-      } catch (e) {
-        print('Warning: Skipping invalid migration file ${file.path}: $e');
-      }
+    final upFiles = files.where((f) => f.path.endsWith('.up.sql'));
+    final result = <Migration>[];
+    for (final up in upFiles) {
+      final base = up.path.substring(0, up.path.length - '.up.sql'.length);
+      final id = _idFromPath(base);
+      final downPath = '$base.down.sql';
+      final downFile = File(downPath);
+      result.add(Migration(
+        id: id,
+        upSql: await up.readAsString(),
+        downSql: await downFile.exists() ? await downFile.readAsString() : '',
+        sourcePath: up.path,
+      ));
     }
-
-    // Sort by timestamp
-    migrations.sort((a, b) => a.timestamp.compareTo(b.timestamp));
-    return migrations;
+    return result;
   }
 
-  /// Get applied migrations from database
-  Future<Set<String>> _getAppliedMigrations({String? connectionName}) async {
-    try {
-      final pool = await _dbConfig.getConnectionPool(connectionName);
-      final pooledConnection = await pool.getConnection();
-      final connection = pooledConnection.connection;
-
-      final results = await connection.query(
-          'SELECT migration_id FROM $_migrationsTable ORDER BY applied_at');
-      await pool.releaseConnection(pooledConnection);
-
-      return results.map((row) => row['migration_id'] as String).toSet();
-    } catch (e) {
-      // Table might not exist yet
-      return <String>{};
-    }
-  }
-
-  /// Get pending migrations
-  Future<List<Migration>> getPendingMigrations({String? connectionName}) async {
-    final allMigrations = await _loadMigrationFiles();
-    final appliedIds =
-        await _getAppliedMigrations(connectionName: connectionName);
-
-    return allMigrations
-        .where((migration) => !appliedIds.contains(migration.id))
-        .toList();
-  }
-
-  /// Get applied migrations
-  Future<List<Migration>> getAppliedMigrations({String? connectionName}) async {
-    final allMigrations = await _loadMigrationFiles();
-    final appliedIds =
-        await _getAppliedMigrations(connectionName: connectionName);
-
-    return allMigrations
-        .where((migration) => appliedIds.contains(migration.id))
-        .toList();
-  }
-
-  /// Apply all pending migrations
-  Future<List<MigrationResult>> migrate({MigrationOptions? options}) async {
-    options ??= const MigrationOptions();
-
+  /// Apply every pending migration from [discovered] in order.
+  /// Each migration runs in its own transaction so a failure stops
+  /// the batch but leaves prior migrations safely committed.
+  Future<MigrationResult> up(List<Migration> discovered) async {
+    await ensureSchema();
+    final applied = await listApplied();
+    final appliedIds = applied.map((m) => m.id).toSet();
     final pending =
-        await getPendingMigrations(connectionName: options.connectionName);
-
+        discovered.where((m) => !appliedIds.contains(m.id)).toList();
     if (pending.isEmpty) {
-      if (options.verbose) {
-        print('✅ No pending migrations');
-      }
-      return [];
+      return const MigrationResult();
     }
 
-    if (options.verbose) {
-      print('📦 Found ${pending.length} pending migrations');
-      for (final migration in pending) {
-        print('   - $migration');
-      }
-    }
+    final nextBatch = applied.isEmpty
+        ? 1
+        : (applied.map((m) => m.batch).reduce((a, b) => a > b ? a : b) + 1);
 
-    if (options.createBackup && !options.dryRun) {
-      await _createBackup(connectionName: options.connectionName);
-    }
-
-    final results = <MigrationResult>[];
-
+    final ranThis = <Migration>[];
     for (final migration in pending) {
-      final result = await _applyMigration(migration, options);
-      results.add(result);
-
-      if (!result.success && !options.force) {
-        if (options.verbose) {
-          print('❌ Migration failed, stopping execution');
-        }
-        break;
-      }
+      await _db.transaction((tx) async {
+        await tx.execute(migration.upSql);
+        await tx.execute(
+          'INSERT INTO "$_trackingTable" ("migration", "batch") '
+          'VALUES (\$1, \$2)',
+          parameters: [migration.id, nextBatch],
+        );
+      });
+      ranThis.add(migration);
     }
-
-    return results;
+    return MigrationResult(applied: ranThis, batch: nextBatch);
   }
 
-  /// Apply a specific migration
-  Future<MigrationResult> _applyMigration(
-      Migration migration, MigrationOptions options) async {
-    final stopwatch = Stopwatch()..start();
-
-    if (options.verbose) {
-      print('🔄 Applying migration: $migration');
-    }
-
-    try {
-      final sqlContent = await File(migration.upFile).readAsString();
-
-      if (options.dryRun) {
-        if (options.verbose) {
-          print('📝 DRY RUN - Would execute:');
-          print(sqlContent);
-        }
-        stopwatch.stop();
-        return MigrationResult.success(migration.id, stopwatch.elapsed);
-      }
-
-      // Execute migration in transaction
-      final pool = await _dbConfig.getConnectionPool(options.connectionName);
-      final pooledConnection = await pool.getConnection();
-      final connection = pooledConnection.connection;
-
-      try {
-        await connection.transaction(() async {
-          // Execute migration SQL
-          await connection.execute(sqlContent);
-
-          // Record migration as applied
-          await connection.execute(
-            'INSERT INTO $_migrationsTable (migration_id, migration_name, applied_at) VALUES (?, ?, ?)',
-            [migration.id, migration.name, DateTime.now().toIso8601String()],
-          );
-        });
-
-        await pool.releaseConnection(pooledConnection);
-        stopwatch.stop();
-
-        if (options.verbose) {
-          print(
-              '✅ Migration applied successfully in ${stopwatch.elapsed.inMilliseconds}ms');
-        }
-
-        return MigrationResult.success(migration.id, stopwatch.elapsed);
-      } catch (e) {
-        await pool.releaseConnection(pooledConnection);
-        throw e;
-      }
-    } catch (e) {
-      stopwatch.stop();
-
-      if (options.verbose) {
-        print('❌ Migration failed: $e');
-      }
-
-      return MigrationResult.failure(
-          migration.id, stopwatch.elapsed, e.toString());
-    }
-  }
-
-  /// Rollback migrations
-  Future<List<MigrationResult>> rollback({
-    int? steps,
-    String? toMigration,
-    MigrationOptions? options,
+  /// Roll back the most recently applied batch (or every batch if
+  /// [steps] exceeds the total number of batches recorded). Migrations
+  /// in a batch are reverted in reverse order.
+  Future<MigrationResult> down({
+    required List<Migration> discovered,
+    int steps = 1,
   }) async {
-    options ??= const MigrationOptions();
-
-    final applied =
-        await getAppliedMigrations(connectionName: options.connectionName);
-    applied.sort((a, b) => b.timestamp.compareTo(a.timestamp)); // Newest first
-
-    List<Migration> toRollback;
-
-    if (toMigration != null) {
-      final targetIndex = applied.indexWhere((m) => m.id == toMigration);
-      if (targetIndex == -1) {
-        throw MigrationException('Target migration not found: $toMigration');
-      }
-      toRollback = applied.take(targetIndex).toList();
-    } else {
-      final rollbackCount = steps ?? 1;
-      toRollback = applied.take(rollbackCount).toList();
+    await ensureSchema();
+    final applied = await listApplied();
+    if (applied.isEmpty || steps <= 0) {
+      return const MigrationResult();
     }
 
-    if (toRollback.isEmpty) {
-      if (options.verbose) {
-        print('✅ No migrations to rollback');
-      }
-      return [];
+    // Group by batch, descending.
+    final byBatch = <int, List<AppliedMigration>>{};
+    for (final m in applied) {
+      byBatch.putIfAbsent(m.batch, () => []).add(m);
     }
+    final batches = byBatch.keys.toList()..sort((a, b) => b.compareTo(a));
+    final batchesToReverse = batches.take(steps).toList();
 
-    if (options.verbose) {
-      print('📦 Rolling back ${toRollback.length} migrations');
-      for (final migration in toRollback) {
-        print('   - $migration');
-      }
-    }
+    final byId = {for (final m in discovered) m.id: m};
+    final rolled = <Migration>[];
+    int? lastBatch;
 
-    if (options.createBackup && !options.dryRun) {
-      await _createBackup(connectionName: options.connectionName);
-    }
-
-    final results = <MigrationResult>[];
-
-    for (final migration in toRollback) {
-      final result = await _rollbackMigration(migration, options);
-      results.add(result);
-
-      if (!result.success && !options.force) {
-        if (options.verbose) {
-          print('❌ Rollback failed, stopping execution');
+    for (final batch in batchesToReverse) {
+      final inBatch = byBatch[batch]!.toList()
+        ..sort((a, b) => b.appliedAt.compareTo(a.appliedAt));
+      lastBatch = batch;
+      for (final applied in inBatch) {
+        final migration = byId[applied.id];
+        if (migration == null) {
+          throw StateError(
+            'Cannot roll back migration "${applied.id}": file not found '
+            'in discovered set. Pass the original migration directory '
+            'when calling down().',
+          );
         }
-        break;
-      }
-    }
-
-    return results;
-  }
-
-  /// Rollback a specific migration
-  Future<MigrationResult> _rollbackMigration(
-      Migration migration, MigrationOptions options) async {
-    final stopwatch = Stopwatch()..start();
-
-    if (options.verbose) {
-      print('⏪ Rolling back migration: $migration');
-    }
-
-    try {
-      final downFile = File(migration.downFile);
-      if (!await downFile.exists()) {
-        throw MigrationException(
-            'Down migration file not found: ${migration.downFile}');
-      }
-
-      final sqlContent = await downFile.readAsString();
-
-      if (options.dryRun) {
-        if (options.verbose) {
-          print('📝 DRY RUN - Would execute:');
-          print(sqlContent);
+        if (migration.downSql.trim().isEmpty) {
+          throw StateError(
+            'Cannot roll back migration "${applied.id}": no down SQL '
+            'was found alongside its up file.',
+          );
         }
-        stopwatch.stop();
-        return MigrationResult.success(migration.id, stopwatch.elapsed);
-      }
-
-      // Execute rollback in transaction
-      final pool = await _dbConfig.getConnectionPool(options.connectionName);
-      final pooledConnection = await pool.getConnection();
-      final connection = pooledConnection.connection;
-
-      try {
-        await connection.transaction(() async {
-          // Execute rollback SQL
-          await connection.execute(sqlContent);
-
-          // Remove migration record
-          await connection.execute(
-            'DELETE FROM $_migrationsTable WHERE migration_id = ?',
-            [migration.id],
+        await _db.transaction((tx) async {
+          await tx.execute(migration.downSql);
+          await tx.execute(
+            'DELETE FROM "$_trackingTable" WHERE "migration" = \$1',
+            parameters: [applied.id],
           );
         });
-
-        await pool.releaseConnection(pooledConnection);
-        stopwatch.stop();
-
-        if (options.verbose) {
-          print(
-              '✅ Migration rolled back successfully in ${stopwatch.elapsed.inMilliseconds}ms');
-        }
-
-        return MigrationResult.success(migration.id, stopwatch.elapsed);
-      } catch (e) {
-        await pool.releaseConnection(pooledConnection);
-        throw e;
+        rolled.add(migration);
       }
-    } catch (e) {
-      stopwatch.stop();
-
-      if (options.verbose) {
-        print('❌ Rollback failed: $e');
-      }
-
-      return MigrationResult.failure(
-          migration.id, stopwatch.elapsed, e.toString());
     }
+    return MigrationResult(rolledBack: rolled, batch: lastBatch ?? 0);
   }
 
-  /// Get migration status
-  Future<void> status({String? connectionName}) async {
-    final allMigrations = await _loadMigrationFiles();
-    final appliedIds =
-        await _getAppliedMigrations(connectionName: connectionName);
-
-    print('📋 Migration Status:');
-    print('');
-
-    if (allMigrations.isEmpty) {
-      print('  No migrations found');
-      return;
-    }
-
-    for (final migration in allMigrations) {
-      final status =
-          appliedIds.contains(migration.id) ? '✅ Applied' : '⏳ Pending';
-      print('  $status  ${migration.id} - ${migration.name}');
-    }
-
-    final pendingCount = allMigrations.length - appliedIds.length;
-    print('');
-    print('  Total: ${allMigrations.length} migrations');
-    print('  Applied: ${appliedIds.length}');
-    print('  Pending: $pendingCount');
-  }
-
-  /// Create database backup
-  Future<void> _createBackup({String? connectionName}) async {
-    // Implementation would depend on database type
-    // For now, just log the action
-    print('💾 Creating database backup...');
-  }
-
-  /// Ensure migrations table exists
-  Future<void> _ensureMigrationsTable({String? connectionName}) async {
-    final pool = await _dbConfig.getConnectionPool(connectionName);
-    final pooledConnection = await pool.getConnection();
-    final connection = pooledConnection.connection;
-
-    try {
-      await connection.execute('''
-        CREATE TABLE IF NOT EXISTS $_migrationsTable (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          migration_id VARCHAR(255) NOT NULL UNIQUE,
-          migration_name VARCHAR(255) NOT NULL,
-          applied_at TIMESTAMP NOT NULL
-        )
-      ''');
-    } finally {
-      await pool.releaseConnection(pooledConnection);
-    }
+  String _idFromPath(String basePath) {
+    final slash = basePath.lastIndexOf(Platform.pathSeparator);
+    return slash < 0 ? basePath : basePath.substring(slash + 1);
   }
 }
