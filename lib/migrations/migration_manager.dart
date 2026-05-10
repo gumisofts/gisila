@@ -156,7 +156,14 @@ class MigrationManager {
     final ranThis = <Migration>[];
     for (final migration in pending) {
       await _db.transaction((tx) async {
-        await tx.execute(migration.upSql);
+        final upSqls = migration.upSql
+            .split(';')
+            .map((s) => s.trim())
+            .where((s) => s.isNotEmpty);
+        for (final sql in upSqls) {
+          await tx.execute(sql);
+        }
+
         await tx.execute(
           'INSERT INTO "$_trackingTable" ("migration", "batch") '
           'VALUES (\$1, \$2)',
@@ -213,7 +220,13 @@ class MigrationManager {
           );
         }
         await _db.transaction((tx) async {
-          await tx.execute(migration.downSql);
+          final downSqls = migration.downSql
+              .split(';')
+              .map((s) => s.trim())
+              .where((s) => s.isNotEmpty);
+          for (final sql in downSqls) {
+            await tx.execute(sql);
+          }
           await tx.execute(
             'DELETE FROM "$_trackingTable" WHERE "migration" = \$1',
             parameters: [applied.id],
