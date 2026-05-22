@@ -1,0 +1,33 @@
+name: gisila
+description: >-
+  A Shelf-based web framework with annotation-driven routing, declarative
+  permission/role checks, pluggable middleware, configurable structured
+  logging, and a small build_runner code generator.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.3.0
+
+dependencies:
+  meta: ^1.11.0
+  shelf: ^1.4.1
+  shelf_router: ^1.1.4
+  collection: ^1.18.0
+  # Body parsing: form-urlencoded + multipart/form-data on top of JSON.
+  http_parser: ^4.0.2
+  mime: ^1.0.4
+
+  # Build-time dependencies are kept in main deps for the same reason
+  # gisila_doc keeps them here: the builder library is exported from
+  # this package, and consumers run it through their own build_runner.
+  analyzer: ">=7.4.0 <8.0.0"
+  build: ">=2.4.1 <3.0.0"
+  source_gen: ">=2.0.0 <3.0.0"
+  dart_style: ">=2.3.7 <4.0.0"
+
+dev_dependencies:
+  lints: ">=3.0.0 <7.0.0"
+  test: ^1.24.0
+  build_runner: ">=2.5.0 <3.0.0"
+  build_test: ">=2.2.0 <4.0.0"

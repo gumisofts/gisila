@@ -1,0 +1,22 @@
+include: package:lints/recommended.yaml
+
+analyzer:
+  exclude:
+    - example/**/*.g.dart
+    - "**/*.g.dart"
+  errors:
+    avoid_print: ignore
+    # Intentional: the builder is pinned to the legacy analyzer
+    # element API (ClassElement/ParameterElement) until source_gen
+    # upstream stabilises on element3.
+    deprecated_member_use: ignore
+    # `library` directives are kept as documentation anchors.
+    unnecessary_library_name: ignore
+
+linter:
+  rules:
+    - prefer_single_quotes
+    - prefer_final_locals
+    - prefer_const_constructors
+    - prefer_const_declarations
+    - unawaited_futures
