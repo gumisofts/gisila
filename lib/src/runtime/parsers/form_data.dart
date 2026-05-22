@@ -97,8 +97,7 @@ FormData _extractFormUrlEncodedFormData({required String body}) {
 }
 
 /// Matches `name="value"` pairs inside a `Content-Disposition` header.
-final _keyValueRegexp =
-    RegExp('(?:(?<key>[a-zA-Z0-9-_]+)="(?<value>.*?)";*)+');
+final _keyValueRegexp = RegExp('(?:(?<key>[a-zA-Z0-9-_]+)="(?<value>.*?)";*)+');
 
 Future<FormData> _extractMultipartFormData({
   required Map<String, String> headers,
@@ -195,8 +194,7 @@ class FormData with MapMixin<String, Object> {
       throw UnsupportedError('FormData is immutable');
 
   @override
-  String toString() =>
-      'FormData(fields: ${_fields.keys.toList()}, '
+  String toString() => 'FormData(fields: ${_fields.keys.toList()}, '
       'files: ${_files.keys.toList()})';
 }
 

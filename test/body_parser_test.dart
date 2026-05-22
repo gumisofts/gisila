@@ -73,8 +73,8 @@ void main() {
       );
       expect(
         () => readBody(request),
-        throwsA(isA<HttpException>().having(
-            (e) => e.statusCode, 'status', 400)),
+        throwsA(
+            isA<HttpException>().having((e) => e.statusCode, 'status', 400)),
       );
     });
 
@@ -84,8 +84,7 @@ void main() {
       expect(body, isNull);
     });
 
-    test('throws when body is required but content-type is missing',
-        () async {
+    test('throws when body is required but content-type is missing', () async {
       final request = Request('POST', Uri.parse('http://x/'));
       expect(
         () => readBody(request),
@@ -102,8 +101,7 @@ void main() {
         headers: {'content-type': 'application/json'},
         body: '{}',
       );
-      expect(() => readFormBody(request),
-          throwsA(isA<BadRequestException>()));
+      expect(() => readFormBody(request), throwsA(isA<BadRequestException>()));
     });
 
     test('returns FormData for urlencoded', () async {
@@ -121,15 +119,15 @@ void main() {
 
   group('allowedContentTypesMiddleware', () {
     test('lets GET requests through unconditionally', () async {
-      final handler = allowedContentTypesMiddleware()(
-          (_) async => Response.ok('ok'));
+      final handler =
+          allowedContentTypesMiddleware()((_) async => Response.ok('ok'));
       final res = await handler(Request('GET', Uri.parse('http://x/')));
       expect(res.statusCode, 200);
     });
 
     test('returns 415 for unsupported POST content type', () async {
-      final handler = allowedContentTypesMiddleware()(
-          (_) async => Response.ok('ok'));
+      final handler =
+          allowedContentTypesMiddleware()((_) async => Response.ok('ok'));
       final res = await handler(Request(
         'POST',
         Uri.parse('http://x/'),
@@ -142,8 +140,8 @@ void main() {
     });
 
     test('accepts allowed POST content type', () async {
-      final handler = allowedContentTypesMiddleware()(
-          (_) async => Response.ok('ok'));
+      final handler =
+          allowedContentTypesMiddleware()((_) async => Response.ok('ok'));
       final res = await handler(Request(
         'POST',
         Uri.parse('http://x/'),

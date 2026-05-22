@@ -39,8 +39,8 @@ class AppConfig {
 
   /// Pluggable logger sink. Defaults to a [ConsoleLogger] with the
   /// configured [logLevel] / [logFormat].
-  Logger get logger => _logger ??=
-      ConsoleLogger(level: logLevel, format: logFormat);
+  Logger get logger =>
+      _logger ??= ConsoleLogger(level: logLevel, format: logFormat);
   Logger? _logger;
   set logger(Logger value) => _logger = value;
 

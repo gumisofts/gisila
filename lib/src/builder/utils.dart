@@ -7,8 +7,7 @@ import 'package:analyzer/dart/element/type.dart';
 
 /// True iff [type] is `T?` (or `Null`).
 bool isNullable(DartType type) =>
-    type.nullabilitySuffix == NullabilitySuffix.question ||
-    type.isDartCoreNull;
+    type.nullabilitySuffix == NullabilitySuffix.question || type.isDartCoreNull;
 
 /// Display string with explicit nullability suffix preserved.
 String typeDisplayNameNullable(DartType type) => type.getDisplayString();
@@ -149,9 +148,8 @@ String dartString(String value) {
 /// Joins a controller prefix with a method-level path, collapsing
 /// trailing/leading slashes.
 String joinPath(String prefix, String suffix) {
-  final p = prefix.endsWith('/')
-      ? prefix.substring(0, prefix.length - 1)
-      : prefix;
+  final p =
+      prefix.endsWith('/') ? prefix.substring(0, prefix.length - 1) : prefix;
   final s = suffix.startsWith('/') ? suffix : '/$suffix';
   final out = '$p$s';
   return out.isEmpty ? '/' : out;

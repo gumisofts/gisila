@@ -205,12 +205,10 @@ class ControllerGenerator extends GeneratorForAnnotation<Controller> {
       handlerBody = '''${extractBlock}final response = await $callArgs;
           return response;''';
     } else if (returnsVoid) {
-      handlerBody =
-          '''${extractBlock}await $callArgs;
+      handlerBody = '''${extractBlock}await $callArgs;
           return emptyResponse(statusCode: ${route.successStatus});''';
     } else {
-      handlerBody =
-          '''${extractBlock}final result = await $callArgs;
+      handlerBody = '''${extractBlock}final result = await $callArgs;
           return jsonResponse(body: result, statusCode: ${route.successStatus});''';
     }
 
@@ -301,8 +299,7 @@ class ControllerGenerator extends GeneratorForAnnotation<Controller> {
   bool _isRouteSubtype(ClassElement element) {
     ClassElement? c = element;
     while (c != null) {
-      if (c.name == 'Route' &&
-          c.library.identifier.contains('gisila')) {
+      if (c.name == 'Route' && c.library.identifier.contains('gisila')) {
         return true;
       }
       final superType = c.supertype;
@@ -364,17 +361,11 @@ class ControllerGenerator extends GeneratorForAnnotation<Controller> {
     if (v == null) return const <String>{};
     final set = v.toSetValue();
     if (set != null) {
-      return set
-          .map((d) => d.toStringValue())
-          .whereType<String>()
-          .toSet();
+      return set.map((d) => d.toStringValue()).whereType<String>().toSet();
     }
     final list = v.toListValue();
     if (list != null) {
-      return list
-          .map((d) => d.toStringValue())
-          .whereType<String>()
-          .toSet();
+      return list.map((d) => d.toStringValue()).whereType<String>().toSet();
     }
     return const <String>{};
   }
@@ -428,38 +419,38 @@ class ControllerGenerator extends GeneratorForAnnotation<Controller> {
       }
 
       if (isShelfRequest(p.type)) {
-        infos.add(_ParamInfo(
-            parameter: p, source: _Source.request, apiName: p.name));
+        infos.add(
+            _ParamInfo(parameter: p, source: _Source.request, apiName: p.name));
         continue;
       }
 
       if (isRequestContext(p.type)) {
-        infos.add(_ParamInfo(
-            parameter: p, source: _Source.context, apiName: p.name));
+        infos.add(
+            _ParamInfo(parameter: p, source: _Source.context, apiName: p.name));
         continue;
       }
 
       if (placeholders.contains(p.name)) {
-        infos.add(_ParamInfo(
-            parameter: p, source: _Source.path, apiName: p.name));
+        infos.add(
+            _ParamInfo(parameter: p, source: _Source.path, apiName: p.name));
         continue;
       }
 
       if (isCoercible(p.type)) {
-        infos.add(_ParamInfo(
-            parameter: p, source: _Source.query, apiName: p.name));
+        infos.add(
+            _ParamInfo(parameter: p, source: _Source.query, apiName: p.name));
         continue;
       }
 
       if (!bodySeen) {
-        infos.add(_ParamInfo(
-            parameter: p, source: _Source.body, apiName: p.name));
+        infos.add(
+            _ParamInfo(parameter: p, source: _Source.body, apiName: p.name));
         bodySeen = true;
         continue;
       }
 
-      infos.add(_ParamInfo(
-          parameter: p, source: _Source.none, apiName: p.name));
+      infos
+          .add(_ParamInfo(parameter: p, source: _Source.none, apiName: p.name));
     }
     return infos;
   }
@@ -524,8 +515,7 @@ class ControllerGenerator extends GeneratorForAnnotation<Controller> {
 
     // ---- FormData -------------------------------------------------------
     if (isFormData(type)) {
-      final reader =
-          'await readFormBody(request, required: $required)';
+      final reader = 'await readFormBody(request, required: $required)';
       if (required) {
         return <String>[
           'final $name = ($reader)!;',
@@ -555,8 +545,7 @@ class ControllerGenerator extends GeneratorForAnnotation<Controller> {
     // ---- List<T> (only meaningful for JSON arrays) ----------------------
     final inner = listElementType(type);
     if (inner != null) {
-      final readerCall =
-          'await readJsonBody(request, required: $required)';
+      final readerCall = 'await readJsonBody(request, required: $required)';
       if (inner is InterfaceType) {
         final innerElement = inner.element;
         if (innerElement is ClassElement &&

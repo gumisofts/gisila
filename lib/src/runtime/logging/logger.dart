@@ -93,7 +93,8 @@ class ConsoleLogger extends Logger {
   @override
   void log(LogEvent event) {
     if (!(event.level >= level)) return;
-    final line = format == LogFormat.json ? _formatJson(event) : _formatText(event);
+    final line =
+        format == LogFormat.json ? _formatJson(event) : _formatText(event);
     if (event.level.priority >= LogLevel.warning.priority) {
       _stderr(line);
     } else {
@@ -107,19 +108,33 @@ class ConsoleLogger extends Logger {
       ..write(' [')
       ..write(e.level.name.toUpperCase().padRight(5))
       ..write(']');
-    if (e.requestId != null) buf..write(' req=')..write(e.requestId);
-    if (e.principalId != null) buf..write(' user=')..write(e.principalId);
-    buf..write(' ')..write(e.message);
+    if (e.requestId != null)
+      buf
+        ..write(' req=')
+        ..write(e.requestId);
+    if (e.principalId != null)
+      buf
+        ..write(' user=')
+        ..write(e.principalId);
+    buf
+      ..write(' ')
+      ..write(e.message);
     if (e.fields.isNotEmpty) {
       buf.write(' ');
       var first = true;
       for (final entry in e.fields.entries) {
         if (!first) buf.write(' ');
         first = false;
-        buf..write(entry.key)..write('=')..write(entry.value);
+        buf
+          ..write(entry.key)
+          ..write('=')
+          ..write(entry.value);
       }
     }
-    if (e.error != null) buf..write(' error=')..write(e.error);
+    if (e.error != null)
+      buf
+        ..write(' error=')
+        ..write(e.error);
     return buf.toString();
   }
 

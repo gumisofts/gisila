@@ -43,8 +43,8 @@ Middleware rateLimitMiddleware([
       );
       final now = DateTime.now();
       final elapsed = now.difference(bucket.lastRefill).inMilliseconds / 1000.0;
-      bucket.tokens =
-          (bucket.tokens + elapsed * refillPerSecond).clamp(0, maxTokens.toDouble());
+      bucket.tokens = (bucket.tokens + elapsed * refillPerSecond)
+          .clamp(0, maxTokens.toDouble());
       bucket.lastRefill = now;
 
       if (bucket.tokens < 1) {

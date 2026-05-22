@@ -43,8 +43,7 @@ void main() {
         'oops',
         fields: <String, Object?>{'where': 'codec'},
       );
-      final record =
-          jsonDecode(lines.single) as Map<String, dynamic>;
+      final record = jsonDecode(lines.single) as Map<String, dynamic>;
       expect(record['level'], 'warning');
       expect(record['msg'], 'oops');
       expect(record['where'], 'codec');

@@ -39,7 +39,7 @@ void main() {
 
   group('jsonResponse', () {
     test('serialises maps and DateTime', () async {
-      final res = jsonResponse(<String, Object?>{
+      final res = jsonResponse(body: <String, Object?>{
         'when': DateTime.utc(2026, 1, 2),
         'count': 3,
       });
@@ -50,7 +50,7 @@ void main() {
     });
 
     test('walks toJson() recursively', () async {
-      final res = jsonResponse(_Demo('alice'));
+      final res = jsonResponse(body: _Demo('alice'));
       expect(await res.readAsString(), '{"name":"alice"}');
     });
   });
