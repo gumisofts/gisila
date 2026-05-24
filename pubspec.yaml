@@ -3,7 +3,7 @@ description: >-
   A Shelf-based web framework with annotation-driven routing, declarative
   permission/role checks, pluggable middleware, configurable structured
   logging, and a small build_runner code generator.
-version: 0.1.0+1
+version: 0.1.1
 repository: https://github.com/gumisofts/gisila
 
 environment:

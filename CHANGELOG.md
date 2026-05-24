@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.1
+
+* Unified version with the rest of the gisila ecosystem (`gisila_doc`, `gisila_orm`, `gisila_studio`).
+* Added `forms.dart`: `FieldValidator`, `EmailVerifier`, and the `form()` helper for declarative request-body validation across JSON, `application/x-www-form-urlencoded`, and `multipart/form-data`.
+* Added `content_type` middleware: rejects `POST`/`PUT`/`PATCH` requests with an unsupported `Content-Type` with a `415 Unsupported Media Type` JSON envelope.
+* Added `body_parser.dart`: `readJsonBody`, `readFormBody`, and `readBody` helpers for content-type-aware payload parsing; used by the code generator for typed body parameters.
+* Added `FormData` abstraction for multipart and URL-encoded payloads.
+
 ## 0.1.0
 
 * Initial release.
