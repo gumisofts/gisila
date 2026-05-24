@@ -108,14 +108,16 @@ class ConsoleLogger extends Logger {
       ..write(' [')
       ..write(e.level.name.toUpperCase().padRight(5))
       ..write(']');
-    if (e.requestId != null)
+    if (e.requestId != null) {
       buf
         ..write(' req=')
         ..write(e.requestId);
-    if (e.principalId != null)
+    }
+    if (e.principalId != null) {
       buf
         ..write(' user=')
         ..write(e.principalId);
+    }
     buf
       ..write(' ')
       ..write(e.message);
@@ -131,10 +133,11 @@ class ConsoleLogger extends Logger {
           ..write(entry.value);
       }
     }
-    if (e.error != null)
+    if (e.error != null) {
       buf
         ..write(' error=')
         ..write(e.error);
+    }
     return buf.toString();
   }
 
