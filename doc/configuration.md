@@ -38,8 +38,8 @@ know.
 | `requestTimeout`       | `Duration?`               | `null`                             | Aborts requests after this duration (504). |
 | `maxRequestBodyBytes`  | `int?`                    | `null`                             | 413 when request body exceeds this. |
 | `errorHandler`         | `ErrorHandler?`           | `null`                             | Maps uncaught exceptions to a `Response`. |
-| `serverHeader`         | `String`                  | `'gisila_web/0.1.0'`               | Value of the `Server` response header. |
-| `poweredByHeader`      | `bool`                    | `true`                             | Sends `X-Powered-By: gisila_web`. |
+| `serverHeader`         | `String`                  | `'gisila/0.1.0'`               | Value of the `Server` response header. |
+| `poweredByHeader`      | `bool`                    | `true`                             | Sends `X-Powered-By: gisila`. |
 | `extra`                | `Map<String, Object?>`    | `const {}`                         | Free-form slot for user middleware. |
 
 ## Logging
@@ -229,7 +229,7 @@ AppConfig(
 
 * `serverHeader` overrides the `Server` response header. Set to `''`
   to send no `Server` header.
-* `poweredByHeader: false` removes the `X-Powered-By: gisila_web`
+* `poweredByHeader: false` removes the `X-Powered-By: gisila`
   header (handy if you don't want to advertise your stack).
 
 ## Extra slot

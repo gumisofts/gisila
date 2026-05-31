@@ -1,4 +1,4 @@
-# gisila_web documentation
+# gisila documentation
 
 This folder contains topic-by-topic guides for the framework. If
 you're new, start with the [tutorial](../GETTING_STARTED.md) and come

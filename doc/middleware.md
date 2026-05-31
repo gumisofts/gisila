@@ -1,6 +1,6 @@
 # Middleware
 
-`gisila_web` builds its request pipeline on top of standard
+`gisila` builds its request pipeline on top of standard
 `shelf.Middleware`. You get a small catalogue out of the box, two
 extension points - **global** and **named per-route** - and the same
 APIs you'd use with hand-written Shelf.

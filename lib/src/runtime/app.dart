@@ -9,13 +9,18 @@ import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:shelf_router/shelf_router.dart';
 
+import 'cache/cache_middleware.dart';
 import 'config.dart';
+import 'context.dart';
+import 'db/db_session_middleware.dart';
 import 'exceptions.dart';
+import 'forms/form.dart' show FormValidationException;
 import 'logging/log_event.dart';
 import 'middleware/cors.dart';
 import 'middleware/rate_limit.dart';
 import 'middleware/request_id.dart';
 import 'middleware/request_logging.dart';
+import 'service.dart';
 
 /// Signature each generated controller exposes via the
 /// `attachToApp(GisilaApp app, Router router, {String prefix})`
@@ -47,6 +52,12 @@ class GisilaApp {
   /// annotation. Populated by [registerNamedMiddleware].
   final Map<String, Middleware> _namedMiddleware = <String, Middleware>{};
 
+  /// Service factories registered via [registerService]. The framework
+  /// instantiates a fresh [Service] per request, attaches the
+  /// [RequestContext], and caches it for the rest of that request.
+  final Map<Type, Service Function()> _serviceFactories =
+      <Type, Service Function()>{};
+
   /// Functions registered via [registerController]. Defer attaching
   /// until [handler] is built so callers can mix and match controllers
   /// in any order.
@@ -77,6 +88,21 @@ class GisilaApp {
     return mw;
   }
 
+  /// Registers a per-request [Service] factory.
+  ///
+  /// `app.registerService<AuthService>(AuthService.new);`
+  ///
+  /// The factory is invoked once per request that needs the service;
+  /// the framework calls [Service.attach] to wire the
+  /// [RequestContext] before the service is handed to a controller.
+  void registerService<S extends Service>(ServiceFactory<S> factory) {
+    _serviceFactories[S] = factory;
+  }
+
+  /// Returns the registered factory for service type [type], or
+  /// `null` if none. Used by the generated controller code.
+  Service Function()? serviceFactory(Type type) => _serviceFactories[type];
+
   /// Registers a controller. Pass the [attacher] manually if you
   /// prefer to keep your controllers opaque; the generator emits a
   /// matching extension method named `attachToApp` so you can just
@@ -98,19 +124,46 @@ class GisilaApp {
 
     var pipeline = const Pipeline();
 
-    // App-injection middleware: stash the app on every request context.
+    // App-injection middleware: stash the app on every request
+    // context, and install the per-request service resolver.
     pipeline = pipeline.addMiddleware((inner) {
       return (Request request) {
-        final req = request.change(context: {
+        final ctx = RequestContext.maybeOf(request);
+        final extras = <String, Object?>{
           ...request.context,
           kAppKey: this,
-        });
+        };
+        if (ctx != null) {
+          ctx.extra[kServiceResolverKey] = _serviceResolver;
+          extras[kContextKey] = ctx;
+        }
+        final req = request.change(context: extras);
         return inner(req);
       };
     });
 
     pipeline = pipeline
         .addMiddleware(requestIdMiddleware(headerName: config.requestIdHeader));
+
+    // Make sure the service resolver lands on the context that
+    // requestIdMiddleware (or a downstream middleware) materialised.
+    pipeline = pipeline.addMiddleware((inner) {
+      return (Request request) {
+        final ctx = RequestContext.maybeOf(request);
+        if (ctx != null) {
+          ctx.extra[kServiceResolverKey] = _serviceResolver;
+        }
+        return inner(request);
+      };
+    });
+
+    if (config.database != null) {
+      pipeline = pipeline.addMiddleware(dbSessionMiddleware(config.database!));
+    }
+
+    if (config.cache != null) {
+      pipeline = pipeline.addMiddleware(cacheMiddleware(config.cache!));
+    }
 
     if (config.cors != null) {
       pipeline = pipeline.addMiddleware(corsMiddleware(config.cors!));
@@ -147,6 +200,28 @@ class GisilaApp {
     return pipeline.addHandler(router.call);
   }
 
+  /// Per-request service cache + resolver. Closes over `this` so the
+  /// service factory map is reachable from inside a handler that only
+  /// has a [RequestContext].
+  Object _serviceResolver(RequestContext ctx, Type type) {
+    final cacheKey = '_gisila.svc:$type';
+    final cached = ctx.extra[cacheKey];
+    if (cached != null) return cached;
+
+    final factory = _serviceFactories[type];
+    if (factory == null) {
+      throw StateError(
+        'No service factory registered for $type. '
+        'Call app.registerService<$type>(factory) before start().',
+      );
+    }
+
+    final instance = factory();
+    instance.attach(ctx);
+    ctx.extra[cacheKey] = instance;
+    return instance;
+  }
+
   /// Backwards-friendly alias of [buildHandler] for embedders that
   /// just want a Shelf [Handler].
   Handler get handler => buildHandler();
@@ -158,6 +233,7 @@ class GisilaApp {
     int port = 8080,
     SecurityContext? securityContext,
   }) async {
+    await config.cache?.connect();
     final h = buildHandler();
     _server = await shelf_io.serve(
       h,
@@ -180,6 +256,7 @@ class GisilaApp {
     if (server == null) return;
     await server.close(force: force);
     _server = null;
+    await config.cache?.disconnect();
   }
 
   /// Resolves the [GisilaApp] previously attached to [request], if
@@ -204,7 +281,30 @@ class GisilaApp {
             body: jsonEncode(e.toJson()),
             headers: const {'content-type': 'application/json; charset=utf-8'},
           );
+        } on FormValidationException catch (e) {
+          return Response(
+            400,
+            body: jsonEncode(<String, Object?>{
+              'error': <String, Object?>{
+                'status': 400,
+                'code': 'validation_failed',
+                'message': e.message,
+                'details': e.errors,
+              },
+            }),
+            headers: const {'content-type': 'application/json; charset=utf-8'},
+          );
         } catch (error, stack) {
+          final dbMapped = config.dbErrorMapper?.map(error, stack);
+          if (dbMapped != null) {
+            return Response(
+              dbMapped.statusCode,
+              body: jsonEncode(dbMapped.toJson()),
+              headers: const {
+                'content-type': 'application/json; charset=utf-8',
+              },
+            );
+          }
           final custom = config.errorHandler;
           if (custom != null) return custom(error, stack);
           config.logger.error(

@@ -1,18 +1,29 @@
-# Getting started with gisila_web
+# Getting started with gisila
 
 A step-by-step tutorial that takes you from an empty directory to a
-running HTTP API with annotation-driven routing, declarative
-permission checks, request-scoped logging, and structured JSON error
-responses. By the end you'll have a small protected "users" service
-backed by gisila_web.
+running HTTP API with annotation-driven routing, typed input forms,
+request-scoped services, declarative permissions, per-route
+configuration, and structured JSON error responses. By the end you'll
+have a small protected "todos" service backed by gisila.
 
 > **Time required:** 10 minutes.
 > **You will need:** Dart SDK 3.3+ and `curl`.
-> **You will write:** one controller and one bootstrap file.
+> **You will write:** one controller, one form, one service, and a
+> bootstrap file.
 
 If you just want the reference, see [README.md](README.md) and the
 [docs/](docs/) folder. This document is the tutorial; it deliberately
 repeats things that are also documented there in shorter form.
+
+> **0.2.0 note (BREAKING):** the package is now imported as
+> `package:gisila/gisila.dart` (formerly `gisila`). The legacy
+> `form()` map helper, the `__inner(Request)` generated handler
+> closure, and any user-land `handleRequest(...)` wrapper are gone.
+> Inputs are typed [Form] subclasses; business logic lives in
+> request-scoped [Service] subclasses; per-route configuration goes
+> into `RouteConfig`. See the [README](README.md) for the new
+> patterns and the [CHANGELOG](CHANGELOG.md) for the migration
+> guide.
 
 ---
 
@@ -20,7 +31,7 @@ repeats things that are also documented there in shorter form.
 
 1. [Prerequisites](#1-prerequisites)
 2. [Create a new Dart project](#2-create-a-new-dart-project)
-3. [Add gisila_web as a dependency](#3-add-gisila_web-as-a-dependency)
+3. [Add gisila as a dependency](#3-add-gisila-as-a-dependency)
 4. [Write your first controller](#4-write-your-first-controller)
 5. [Generate the routing code](#5-generate-the-routing-code)
 6. [Boot the server](#6-boot-the-server)
@@ -71,7 +82,7 @@ todo_api/
 
 ---
 
-## 3. Add gisila_web as a dependency
+## 3. Add gisila as a dependency
 
 If you've cloned the `gisila_tools` monorepo locally, point at the
 sibling package directly:
@@ -79,15 +90,15 @@ sibling package directly:
 ```yaml
 # pubspec.yaml
 name: todo_api
-description: A small protected API powered by gisila_web.
+description: A small protected API powered by gisila.
 publish_to: none
 
 environment:
   sdk: ^3.3.0
 
 dependencies:
-  gisila_web:
-    path: ../gisila_web
+  gisila:
+    path: ../gisila
 
 dev_dependencies:
   build_runner: ^2.5.0
@@ -101,10 +112,9 @@ Then:
 dart pub get
 ```
 
-> A single `package:gisila_web/gisila_web.dart` import re-exports
-> everything you need from `shelf`, `shelf_router`, the framework
-> runtime, and the annotation set. You will rarely need to import
-> `shelf` directly.
+> A single `package:gisila/gisila.dart` import re-exports everything
+> you need from `shelf`, `shelf_router`, the framework runtime, and
+> the annotation set. You will rarely need to import `shelf` directly.
 
 ---
 
@@ -113,7 +123,7 @@ dart pub get
 Create `lib/controllers/todos_controller.dart`:
 
 ```dart
-import 'package:gisila_web/gisila_web.dart';
+import 'package:gisila/gisila.dart';
 
 part 'todos_controller.g.dart';                  // <-- required
 
@@ -179,7 +189,7 @@ if you're curious - it's plain Dart and very easy to read.
 Edit `bin/todo_api.dart`:
 
 ```dart
-import 'package:gisila_web/gisila_web.dart';
+import 'package:gisila/gisila.dart';
 import 'package:todo_api/controllers/todos_controller.dart';
 
 Future<void> main() async {
@@ -200,7 +210,7 @@ That is the entire bootstrap. Start it:
 
 ```bash
 dart run bin/todo_api.dart
-# 2026-05-22T14:00:00Z [INFO ] gisila_web listening on http://0.0.0.0:8080 ...
+# 2026-05-22T14:00:00Z [INFO ] gisila listening on http://0.0.0.0:8080 ...
 ```
 
 Leave it running in this terminal; open a second one for the requests
@@ -226,8 +236,8 @@ You also get framework-supplied response headers for free:
 
 ```
 x-request-id: f1qsK3Bz...
-server: gisila_web/0.1.0
-x-powered-by: gisila_web
+server: gisila/0.1.0
+x-powered-by: gisila
 content-type: application/json; charset=utf-8
 ```
 
@@ -239,29 +249,41 @@ And the server console prints one log line per request:
 
 ---
 
-## 8. Add a request body
+## 8. Add a request body via a typed Form
 
-Add a typed body class at the bottom of `todos_controller.dart`:
+Forms in gisila are typed: you declare a `Form` subclass with one
+`FormField` per expected request input, and the framework hands your
+controller a fully populated typed instance. Only declared fields are
+read; values are already parsed (never raw strings); validation errors
+become a structured `400`.
+
+Add a form class at the bottom of `todos_controller.dart` (or in its
+own `lib/forms/todo_forms.dart` file):
 
 ```dart
-class CreateTodo {
-  CreateTodo({required this.text});
+class CreateTodoForm extends Form {
+  final text = StringField(
+    name: 'text',
+    required: true,
+    minLength: 1,
+    maxLength: 280,
+  );
 
-  factory CreateTodo.fromJson(Map<String, dynamic> json) =>
-      CreateTodo(text: json['text'] as String);
-
-  final String text;
+  @override
+  List<FormField<Object?>> collectFields() => [text];
 }
 ```
 
-Then a route:
+Then a route. Note the controller method *takes the form as a typed
+parameter* - the framework binds the request body for you, no manual
+`form(...)`, no `request.readAsString()`, no casts:
 
 ```dart
   @Post('/')
-  Future<Map<String, Object?>> create(CreateTodo body) async {
+  Future<Map<String, Object?>> create(CreateTodoForm body) async {
     final id = (_store.length + 1).toString();
-    _store[id] = body.text;
-    return <String, Object?>{'id': id, 'text': body.text};
+    _store[id] = body.text.value!;     // already parsed and validated
+    return <String, Object?>{'id': id, 'text': body.text.value};
   }
 ```
 
@@ -280,18 +302,24 @@ curl -s -X POST -H 'content-type: application/json' \
      -d '{"text":"buy milk"}' http://localhost:8080/todos/
 # {"id":"1","text":"buy milk"}
 
-# Missing body:
-curl -s -X POST http://localhost:8080/todos/
-# {"error":{"status":400,"message":"Request body is required.","code":"bad_request"}}
+# Missing field:
+curl -s -X POST -H 'content-type: application/json' \
+     -d '{}' http://localhost:8080/todos/
+# {"error":{"status":400,"code":"validation_failed",
+#   "message":"Invalid form data",
+#   "details":{"text":"This field is required"}}}
 
-# Malformed JSON:
-curl -s -X POST -H 'content-type: application/json' -d 'not json' \
-     http://localhost:8080/todos/
-# {"error":{"status":400,"message":"Malformed JSON body: ...","code":"bad_request"}}
+# Validation failure (too long):
+curl -s -X POST -H 'content-type: application/json' \
+     -d '{"text":"...(over 280 chars)..."}' http://localhost:8080/todos/
+# {"error":{"status":400,"code":"validation_failed",
+#   "message":"Invalid form data",
+#   "details":{"text":"Must be at most 280 characters"}}}
 ```
 
-The decoder calls your `fromJson` factory automatically; if you forget
-it, the framework returns a `400` instead of crashing.
+The same `CreateTodoForm` also binds `application/x-www-form-urlencoded`
+and `multipart/form-data` bodies. No `fromJson` / `fromForm` factories
+needed - the field types know how to parse themselves.
 
 ---
 
@@ -482,7 +510,7 @@ shelf's `Pipeline`:
 // test/todos_controller_test.dart
 import 'dart:convert';
 
-import 'package:gisila_web/gisila_web.dart';
+import 'package:gisila/gisila.dart';
 import 'package:todo_api/controllers/todos_controller.dart';
 import 'package:test/test.dart';
 

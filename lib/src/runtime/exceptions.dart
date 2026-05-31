@@ -68,3 +68,49 @@ class InternalServerError extends HttpException {
   InternalServerError([String message = 'Internal server error'])
       : super(500, message, code: 'internal_error');
 }
+
+/// Application-level exception that maps to a custom status code and
+/// an arbitrary JSON body.
+///
+/// Use this when none of the named subclasses fits and you want full
+/// control over the rendered envelope:
+///
+/// ```dart
+/// throw EndpointException(
+///   statusCode: 422,
+///   body: {'detail': 'Order rejected by payment processor'},
+/// );
+/// ```
+///
+/// Subclassed by [HttpException], so the framework's error middleware
+/// catches it via the same code path as the named exceptions.
+class EndpointException extends HttpException {
+  EndpointException({
+    required int statusCode,
+    Map<String, Object?>? body,
+    String? message,
+    String? code,
+  })  : _body = body,
+        super(
+          statusCode,
+          message ?? _bodyDetail(body) ?? 'Endpoint error',
+          code: code,
+          details: body,
+        );
+
+  final Map<String, Object?>? _body;
+
+  /// Returns the user-supplied body when available, otherwise the
+  /// standard `{error: {...}}` envelope built by [HttpException].
+  @override
+  Map<String, Object?> toJson() {
+    if (_body != null) return _body;
+    return super.toJson();
+  }
+
+  static String? _bodyDetail(Map<String, Object?>? body) {
+    if (body == null) return null;
+    final detail = body['detail'] ?? body['message'];
+    return detail?.toString();
+  }
+}

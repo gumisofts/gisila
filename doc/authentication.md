@@ -1,6 +1,6 @@
 # Authentication
 
-`gisila_web` does **not** assume how you authenticate users. Instead
+`gisila` does **not** assume how you authenticate users. Instead
 it gives you two small interfaces - `Authenticator` and
 `PermissionResolver` - and calls them from the guard runtime so the
 annotations stay declarative.
@@ -118,7 +118,7 @@ Use any JWT package on pub.dev (e.g. `dart_jsonwebtoken`,
 
 ```dart
 import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
-import 'package:gisila_web/gisila_web.dart';
+import 'package:gisila/gisila.dart';
 
 class JwtAuthenticator extends Authenticator {
   const JwtAuthenticator(this._secret);

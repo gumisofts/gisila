@@ -7,13 +7,14 @@ part of 'users_controller.dart';
 // **************************************************************************
 
 // **************************************************
-// gisila_orm: generated for UsersController
+// gisila: generated for UsersController
 // **************************************************
 
 extension UsersControllerGisilaWeb on UsersController {
   /// Registers every annotated route of this controller on
-  /// [router] using [app] for authentication, permission
-  /// checks, named middleware lookup, and logging.
+  /// [router] using [app] for service resolution, named
+  /// middleware lookup, authentication, permission checks,
+  /// per-route configuration and error handling.
   ///
   /// Pass [prefix] to mount the controller under an extra
   /// path segment (e.g. an `/api/v1` versioning prefix).
@@ -24,239 +25,213 @@ extension UsersControllerGisilaWeb on UsersController {
   }) {
     {
       final basePath = '$prefix/users/ping';
-      Future<Response> __inner(Request request) async {
-        try {
-          final __guardResult = await guardRequest(
-            request,
-            requireAuth: false,
-            permissions: const <String>{},
-            anyPermission: const <String>{},
-            roles: const <String>{},
-          );
-          if (__guardResult is Response) return __guardResult;
-
-          final result = await this.ping();
-          return jsonResponse(result, statusCode: 200);
-        } on TypeError catch (e) {
-          throw BadRequestException('Invalid request payload ($e)');
-        } on FormatException catch (e) {
-          throw BadRequestException('Invalid request format: ${e.message}');
-        }
-      }
-
-      router.get(basePath, __inner);
+      final RouteConfig __cfg =
+          RouteConfig.empty.merge(const RouteConfig(isPublic: true));
+      router.get(
+          basePath,
+          gisilaRoute(
+            app: app,
+            config: __cfg,
+            handler: (RequestContext ctx) async {
+              try {
+                final result = await this.ping();
+                return jsonResponse(body: result, statusCode: 200);
+              } on TypeError catch (e) {
+                throw BadRequestException('Invalid request payload ($e)');
+              } on FormatException catch (e) {
+                throw BadRequestException(
+                    'Invalid request format: ${e.message}');
+              }
+            },
+          ));
     }
     {
       final basePath = '$prefix/users/';
-      Future<Response> __inner(Request request) async {
-        try {
-          final __guardResult = await guardRequest(
-            request,
-            requireAuth: true,
-            permissions: const <String>{'users:read'},
-            anyPermission: const <String>{},
-            roles: const <String>{},
-          );
-          if (__guardResult is Response) return __guardResult;
-
-          final limit = coerce<int?>(
-              request.url.queryParameters['limit'], 'limit',
-              required: false);
-          final offset = coerce<int?>(
-              request.url.queryParameters['offset'], 'offset',
-              required: false);
-          final result = await this.listUsers(limit: limit, offset: offset);
-          return jsonResponse(result, statusCode: 200);
-        } on TypeError catch (e) {
-          throw BadRequestException('Invalid request payload ($e)');
-        } on FormatException catch (e) {
-          throw BadRequestException('Invalid request format: ${e.message}');
-        }
-      }
-
-      router.get(basePath, __inner);
-    }
-    {
-      final basePath = '$prefix/users/me';
-      Future<Response> __inner(Request request) async {
-        try {
-          final __guardResult = await guardRequest(
-            request,
-            requireAuth: true,
-            permissions: const <String>{},
-            anyPermission: const <String>{},
-            roles: const <String>{},
-          );
-          if (__guardResult is Response) return __guardResult;
-          final ctx = __guardResult as RequestContext;
-          final result = await this.me(ctx);
-          return jsonResponse(result, statusCode: 200);
-        } on TypeError catch (e) {
-          throw BadRequestException('Invalid request payload ($e)');
-        } on FormatException catch (e) {
-          throw BadRequestException('Invalid request format: ${e.message}');
-        }
-      }
-
-      router.get(basePath, __inner);
-    }
-    {
-      final basePath = '$prefix/users/<id>';
-      Future<Response> __inner(Request request) async {
-        try {
-          final __guardResult = await guardRequest(
-            request,
-            requireAuth: true,
-            permissions: const <String>{'users:read'},
-            anyPermission: const <String>{},
-            roles: const <String>{},
-          );
-          if (__guardResult is Response) return __guardResult;
-
-          final id = coerce<String>(request.params['id'], 'id', required: true);
-          final result = await this.getUser(id);
-          return jsonResponse(result, statusCode: 200);
-        } on TypeError catch (e) {
-          throw BadRequestException('Invalid request payload ($e)');
-        } on FormatException catch (e) {
-          throw BadRequestException('Invalid request format: ${e.message}');
-        }
-      }
-
-      router.get(basePath, __inner);
+      final RouteConfig __cfg = RouteConfig.empty
+          .merge(const RouteConfig(
+              requireAuth: true, permissions: const <String>{'users:read'}))
+          .merge(const RouteConfig(
+              rateLimit: const RateLimitConfig(requestsPerMinute: 60)));
+      router.get(
+          basePath,
+          gisilaRoute(
+            app: app,
+            config: __cfg,
+            handler: (RequestContext ctx) async {
+              try {
+                final request = ctx.request;
+                final users = ctx.service<UserService>();
+                final limit = coerce<int?>(
+                    request.url.queryParameters['limit'], 'limit',
+                    required: false);
+                final offset = coerce<int?>(
+                    request.url.queryParameters['offset'], 'offset',
+                    required: false);
+                final result =
+                    await this.listUsers(users, limit: limit, offset: offset);
+                return jsonResponse(body: result, statusCode: 200);
+              } on TypeError catch (e) {
+                throw BadRequestException('Invalid request payload ($e)');
+              } on FormatException catch (e) {
+                throw BadRequestException(
+                    'Invalid request format: ${e.message}');
+              }
+            },
+          ));
     }
     {
       final basePath = '$prefix/users/';
-      Future<Response> __inner(Request request) async {
-        try {
-          final __guardResult = await guardRequest(
-            request,
-            requireAuth: true,
-            permissions: const <String>{'users:write'},
-            anyPermission: const <String>{},
-            roles: const <String>{},
-          );
-          if (__guardResult is Response) return __guardResult;
-
-          final __raw_body = await readBody(request, required: true);
-          final body =
-              CreateUser.fromJson((__raw_body as Map).cast<String, dynamic>());
-          final result = await this.createUser(body);
-          return jsonResponse(result, statusCode: 201);
-        } on TypeError catch (e) {
-          throw BadRequestException('Invalid request payload ($e)');
-        } on FormatException catch (e) {
-          throw BadRequestException('Invalid request format: ${e.message}');
-        }
-      }
-
-      router.post(basePath, __inner);
+      final RouteConfig __cfg = RouteConfig.empty
+          .merge(const RouteConfig(isPublic: true))
+          .merge(const RouteConfig(
+              rateLimit: const RateLimitConfig(requestsPerMinute: 30)));
+      router.post(
+          basePath,
+          gisilaRoute(
+            app: app,
+            config: __cfg,
+            handler: (RequestContext ctx) async {
+              try {
+                final request = ctx.request;
+                final form = await bindForm(request, RegisterForm.new);
+                final users = ctx.service<UserService>();
+                final result = await this.register(form, users);
+                return jsonResponse(body: result, statusCode: 201);
+              } on TypeError catch (e) {
+                throw BadRequestException('Invalid request payload ($e)');
+              } on FormatException catch (e) {
+                throw BadRequestException(
+                    'Invalid request format: ${e.message}');
+              }
+            },
+          ));
     }
     {
       final basePath = '$prefix/users/login';
-      Future<Response> __inner(Request request) async {
-        try {
-          final __guardResult = await guardRequest(
-            request,
-            requireAuth: false,
-            permissions: const <String>{},
-            anyPermission: const <String>{},
-            roles: const <String>{},
-          );
-          if (__guardResult is Response) return __guardResult;
-
-          final __raw_body = await readBody(request, required: true);
-          final body = __raw_body is FormData
-              ? LoginForm.fromForm((__raw_body as Map).cast<String, dynamic>())
-              : LoginForm.fromJson((__raw_body as Map).cast<String, dynamic>());
-          final result = await this.login(body);
-          return jsonResponse(result, statusCode: 201);
-        } on TypeError catch (e) {
-          throw BadRequestException('Invalid request payload ($e)');
-        } on FormatException catch (e) {
-          throw BadRequestException('Invalid request format: ${e.message}');
-        }
-      }
-
-      router.post(basePath, __inner);
+      final RouteConfig __cfg =
+          RouteConfig.empty.merge(const RouteConfig(isPublic: true));
+      router.post(
+          basePath,
+          gisilaRoute(
+            app: app,
+            config: __cfg,
+            handler: (RequestContext ctx) async {
+              try {
+                final request = ctx.request;
+                final form = await bindForm(request, LoginForm.new);
+                final users = ctx.service<UserService>();
+                final result = await this.login(form, users);
+                return jsonResponse(body: result, statusCode: 201);
+              } on TypeError catch (e) {
+                throw BadRequestException('Invalid request payload ($e)');
+              } on FormatException catch (e) {
+                throw BadRequestException(
+                    'Invalid request format: ${e.message}');
+              }
+            },
+          ));
     }
     {
-      final basePath = '$prefix/users/<id>/avatar';
-      Future<Response> __inner(Request request) async {
-        try {
-          final __guardResult = await guardRequest(
-            request,
-            requireAuth: true,
-            permissions: const <String>{'users:write'},
-            anyPermission: const <String>{},
-            roles: const <String>{},
-          );
-          if (__guardResult is Response) return __guardResult;
-
-          final id = coerce<String>(request.params['id'], 'id', required: true);
-          final __form_file = await readFormBody(request, required: true);
-          final file = __form_file!.files['file'] ??
-              (throw BadRequestException(
-                  'Missing file "file" in multipart body.'));
-          final result = await this.uploadAvatar(id, file);
-          return jsonResponse(result, statusCode: 201);
-        } on TypeError catch (e) {
-          throw BadRequestException('Invalid request payload ($e)');
-        } on FormatException catch (e) {
-          throw BadRequestException('Invalid request format: ${e.message}');
-        }
-      }
-
-      router.post(basePath, __inner);
+      final basePath = '$prefix/users/me';
+      final RouteConfig __cfg =
+          RouteConfig.empty.merge(const RouteConfig(requireAuth: true));
+      router.get(
+          basePath,
+          gisilaRoute(
+            app: app,
+            config: __cfg,
+            handler: (RequestContext ctx) async {
+              try {
+                final result = await this.me(ctx);
+                return jsonResponse(body: result, statusCode: 200);
+              } on TypeError catch (e) {
+                throw BadRequestException('Invalid request payload ($e)');
+              } on FormatException catch (e) {
+                throw BadRequestException(
+                    'Invalid request format: ${e.message}');
+              }
+            },
+          ));
     }
     {
       final basePath = '$prefix/users/<id>';
-      Future<Response> __inner(Request request) async {
-        try {
-          final __guardResult = await guardRequest(
-            request,
-            requireAuth: true,
-            permissions: const <String>{},
-            anyPermission: const <String>{'admin', 'users:write'},
-            roles: const <String>{},
-          );
-          if (__guardResult is Response) return __guardResult;
-
-          final id = coerce<String>(request.params['id'], 'id', required: true);
-          await this.deleteUser(id);
-          return emptyResponse(statusCode: 204);
-        } on TypeError catch (e) {
-          throw BadRequestException('Invalid request payload ($e)');
-        } on FormatException catch (e) {
-          throw BadRequestException('Invalid request format: ${e.message}');
-        }
-      }
-
-      router.delete(basePath, __inner);
+      final RouteConfig __cfg = RouteConfig.empty.merge(const RouteConfig(
+          requireAuth: true, permissions: const <String>{'users:read'}));
+      router.get(
+          basePath,
+          gisilaRoute(
+            app: app,
+            config: __cfg,
+            handler: (RequestContext ctx) async {
+              try {
+                final request = ctx.request;
+                final id =
+                    coerce<String>(request.params['id'], 'id', required: true);
+                final users = ctx.service<UserService>();
+                final result = await this.getUser(id, users);
+                return jsonResponse(body: result, statusCode: 200);
+              } on TypeError catch (e) {
+                throw BadRequestException('Invalid request payload ($e)');
+              } on FormatException catch (e) {
+                throw BadRequestException(
+                    'Invalid request format: ${e.message}');
+              }
+            },
+          ));
     }
     {
-      final basePath = '$prefix/users/admin/audit';
-      Future<Response> __inner(Request request) async {
-        try {
-          final __guardResult = await guardRequest(
-            request,
-            requireAuth: true,
-            permissions: const <String>{},
-            anyPermission: const <String>{},
-            roles: const <String>{'admin'},
-          );
-          if (__guardResult is Response) return __guardResult;
-
-          final result = await this.audit();
-          return jsonResponse(result, statusCode: 200);
-        } on TypeError catch (e) {
-          throw BadRequestException('Invalid request payload ($e)');
-        } on FormatException catch (e) {
-          throw BadRequestException('Invalid request format: ${e.message}');
-        }
-      }
-
-      router.get(basePath, __inner);
+      final basePath = '$prefix/users/<id>';
+      final RouteConfig __cfg = RouteConfig.empty.merge(const RouteConfig(
+          requireAuth: true, permissions: const <String>{'users:write'}));
+      router.patch(
+          basePath,
+          gisilaRoute(
+            app: app,
+            config: __cfg,
+            handler: (RequestContext ctx) async {
+              try {
+                final request = ctx.request;
+                final id =
+                    coerce<String>(request.params['id'], 'id', required: true);
+                final form = await bindForm(request, UpdateUserForm.new);
+                final users = ctx.service<UserService>();
+                final result = await this.updateUser(id, form, users);
+                return jsonResponse(body: result, statusCode: 200);
+              } on TypeError catch (e) {
+                throw BadRequestException('Invalid request payload ($e)');
+              } on FormatException catch (e) {
+                throw BadRequestException(
+                    'Invalid request format: ${e.message}');
+              }
+            },
+          ));
+    }
+    {
+      final basePath = '$prefix/users/<id>';
+      final RouteConfig __cfg = RouteConfig.empty.merge(const RouteConfig(
+          requireAuth: true,
+          anyPermission: const <String>{'admin', 'users:write'}));
+      router.delete(
+          basePath,
+          gisilaRoute(
+            app: app,
+            config: __cfg,
+            handler: (RequestContext ctx) async {
+              try {
+                final request = ctx.request;
+                final id =
+                    coerce<String>(request.params['id'], 'id', required: true);
+                final users = ctx.service<UserService>();
+                await this.deleteUser(id, users);
+                return emptyResponse(statusCode: 204);
+              } on TypeError catch (e) {
+                throw BadRequestException('Invalid request payload ($e)');
+              } on FormatException catch (e) {
+                throw BadRequestException(
+                    'Invalid request format: ${e.message}');
+              }
+            },
+          ));
     }
   }
 }

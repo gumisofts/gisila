@@ -1,7 +1,7 @@
 # Cookbook
 
 Short, copy-paste-friendly recipes for common needs. Most are 10-20
-lines on top of what `gisila_web` ships with.
+lines on top of what `gisila` ships with.
 
 ## Table of contents
 
@@ -369,20 +369,20 @@ Middleware tracingMiddleware(Tracer tracer) {
   };
 }
 
-app.use(tracingMiddleware(otel.tracer('gisila_web')));
+app.use(tracingMiddleware(otel.tracer('gisila')));
 ```
 
 ## OpenAPI / Swagger (with `shelf_openapi`)
 
-`gisila_web` and `shelf_openapi` are independent packages. If you
+`gisila` and `shelf_openapi` are independent packages. If you
 also want auto-generated OpenAPI docs, add `shelf_openapi` to the
 same controller class and run both generators:
 
 ```dart
-import 'package:gisila_web/gisila_web.dart' hide Body, Path, Query, Header;
+import 'package:gisila/gisila.dart' hide Body, Path, Query, Header;
 import 'package:shelf_openapi/shelf_openapi.dart' as openapi;
 
-part 'users_controller.g.dart';                    // gisila_web
+part 'users_controller.g.dart';                    // gisila
 part 'users_controller.openapi.g.dart';            // shelf_openapi (configure separately)
 ```
 

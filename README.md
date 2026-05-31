@@ -1,9 +1,11 @@
 # gisila
 
-> A small, opinionated **Shelf**-based web framework for Dart with
-> annotation-driven routing, declarative permission/role checks,
-> pluggable middleware, configurable structured logging, and a tiny
-> `build_runner` code generator.
+> A small, opinionated **MVC** web framework for Dart on top of
+> **Shelf**. Annotation-driven routing, typed input forms,
+> request-scoped services, declarative permissions, per-route
+> configuration (rate limit / timeout / middleware), pluggable
+> database, structured logging, and a tiny `build_runner` code
+> generator.
 
 ```dart
 @Controller('/users')
@@ -13,21 +15,45 @@ class UsersController {
   Future<Map<String, Object?>> me(RequestContext ctx) async =>
       {'id': ctx.principal!.id};
 
-  @Post('/')
+  // Typed form (no `Request`, no manual body parsing) + auto-injected
+  // service (no constructor wiring at the controller).
+  @Post(
+    '/',
+    config: RouteConfig(
+      rateLimit: RateLimitConfig(requestsPerMinute: 30),
+    ),
+  )
   @Permissions({'users:write'})
-  Future<User> create(@Body() CreateUser body) async => repo.create(body);
+  Future<User> create(RegisterForm form, UserService users) =>
+      users.register(
+        email: form.email.value!,
+        password: form.password.value!,
+        name: form.name.value!,
+      );
 
   @Delete('/{id}')
   @AnyPermission({'admin', 'users:write'})
-  Future<void> delete(String id) async => repo.delete(id);
+  Future<void> delete(String id, UserService users) => users.delete(id);
 
   @Get('/admin/audit')
   @Roles({'admin'})
-  Future<Map<String, Object?>> audit() async => repo.audit();
+  Future<Map<String, Object?>> audit(UserService users) =>
+      users.audit();
 
   @Get('/ping')
   @Public()
   Future<Map<String, Object?>> ping() async => {'status': 'ok'};
+}
+```
+
+```dart
+class RegisterForm extends Form {
+  final email    = EmailField(name: 'email',    required: true);
+  final password = PasswordField(name: 'password', required: true);
+  final name     = StringField(name: 'name',    required: true, maxLength: 100);
+
+  @override
+  List<FormField<Object?>> collectFields() => [email, password, name];
 }
 ```
 
@@ -37,7 +63,14 @@ final app = GisilaApp(
     logLevel: LogLevel.info,
     logFormat: LogFormat.text,
     cors: const CorsConfig(),
-    rateLimit: const RateLimitConfig(requestsPerMinute: 300),
+    // Baseline applied to every route; method-level `config:` overrides.
+    defaultRouteConfig: const RouteConfig(
+      rateLimit: RateLimitConfig(requestsPerMinute: 300),
+      timeout: Duration(seconds: 15),
+    ),
+    // Optional: per-request DB session via your DatabaseProvider.
+    // database: GisilaOrmDatabaseProvider(...),
+    // dbErrorMapper: PostgresErrorMapper(),
     authenticator: const StaticTokenAuthenticator({
       'admin-token': Principal(
         id: 'admin',
@@ -46,14 +79,21 @@ final app = GisilaApp(
       ),
     }),
   ),
-)..registerController(attacher: UsersController().attachToApp);
+);
+
+app.registerService<UserService>(UserService.new);
+app.registerController(attacher: UsersController().attachToApp);
 
 await app.start(host: '0.0.0.0', port: 8080);
 ```
 
-Routes, permission gates, JSON body decoding, request-id propagation,
-per-request log line, and `401 / 403 / 400 / 500` error envelopes are
-all wired automatically.
+Routes, permission gates, body parsing into typed forms, service
+injection, request-id propagation, per-route rate limit / timeout,
+per-request DB session, structured access log, and
+`400 / 401 / 403 / 404 / 409 / 422 / 500` error envelopes are all
+wired automatically. No `handleRequest(...)` wrapper, no
+`request.contextDb`, no inline permission checks - the framework owns
+the pipeline; controllers stay thin.
 
 > **New here?** Walk through the
 > [10-minute tutorial](GETTING_STARTED.md) — it takes you from an
@@ -115,10 +155,90 @@ each controller class.
 * `@Controller([path])` — marks a class as a controller and (optionally)
   a path prefix applied to every route in the class.
 * `@Get / @Post / @Put / @Patch / @Delete / @Head / @Options` —
-  HTTP-method route annotations. Each carries the path and an optional
-  success status code.
+  HTTP-method route annotations. Each carries the path, an optional
+  success status code, and an optional `config: RouteConfig` overlay.
+* `@UseRouteConfig(RouteConfig(...))` — controller-wide route defaults.
 * `@Path / @Query / @Header / @Body` — parameter-source overrides
   (rarely needed; the generator infers from name and type).
+* `Form` subclasses — typed input validation; parameters of any
+  `Form`-derived type are bound from the request body automatically.
+* `Service` subclasses — request-scoped business-logic classes;
+  parameters of any `Service`-derived type are instantiated and
+  injected per request.
+
+### Per-route configuration (RouteConfig)
+
+Every annotation accepts a `config:` parameter. Use it to override
+just the fields you care about; the framework merges in this order:
+
+`AppConfig.defaultRouteConfig` ← `@UseRouteConfig` ← guard annotations
+(`@RequireAuth` / `@Permissions` / …) ← method-level `config:` ←
+named-middleware list.
+
+```dart
+@Post(
+  '/login',
+  config: RouteConfig(
+    rateLimit: RateLimitConfig(requestsPerMinute: 10),
+    timeout: Duration(seconds: 5),
+    contentTypes: {'application/json'},
+    maxBodyBytes: 4 * 1024,
+  ),
+)
+@Public()
+Future<...> login(LoginForm form, AuthService auth) => ...;
+```
+
+### Typed forms
+
+Declare a `Form` subclass per endpoint input shape. Field types know
+how to parse + validate themselves and the framework returns a fully
+populated typed object - only fields you declared, values already
+parsed (never raw strings):
+
+```dart
+class LoginForm extends Form {
+  final email    = EmailField(name: 'email',    required: true);
+  final password = StringField(name: 'password', required: true);
+  final remember = BoolField(name: 'remember');
+
+  @override
+  List<FormField<Object?>> collectFields() => [email, password, remember];
+}
+```
+
+Built-in fields: `StringField`, `IntField`, `DoubleField`, `BoolField`,
+`DateTimeField`, `EmailField`, `PasswordField`, `JsonField`,
+`FileField`. Validation failures throw `FormValidationException`
+which the framework renders as a `400` with a `{fieldName: message}`
+map.
+
+### Services
+
+Move business logic + DB access out of controllers:
+
+```dart
+class UserService extends Service {
+  Future<User> register({required String email, ...}) async {
+    final db = ctx.db<Database>();  // request-scoped session
+    return Query<User>(...).insert({...}).one(db);
+  }
+}
+
+// Bootstrap:
+app.registerService<UserService>(UserService.new);
+```
+
+A fresh service is materialised per request; the framework injects
+`RequestContext` (and therefore `db`) before any service method runs.
+
+### Database
+
+Implement `DatabaseProvider<S>` for your driver (a `gisila_orm`
+adapter ships with the consumer apps). The framework runs a per-
+request session middleware that opens a session on entry, closes /
+commits / rolls back based on the response status, and exposes the
+session through `ctx.db<S>()`.
 
 ### Declarative permissions
 
@@ -201,15 +321,18 @@ Every request produces a single log line:
 
 ### Bundled middleware
 
-| Middleware              | Configured via                  |
-| ----------------------- | ------------------------------- |
-| Request ID propagation  | `AppConfig.requestIdHeader`     |
-| Structured access log   | `logRequests` + logger          |
-| CORS (incl. pre-flight) | `AppConfig.cors`                |
-| Rate limiting           | `AppConfig.rateLimit`           |
-| Body-size limit         | `AppConfig.maxRequestBodyBytes` |
-| Request timeout         | `AppConfig.requestTimeout`      |
-| Error mapping           | `AppConfig.errorHandler`        |
+| Middleware              | Configured via                              |
+| ----------------------- | ------------------------------------------- |
+| Request ID propagation  | `AppConfig.requestIdHeader`                 |
+| DB session lifecycle    | `AppConfig.database`                        |
+| Structured access log   | `logRequests` + logger                      |
+| CORS (incl. pre-flight) | `AppConfig.cors`                            |
+| Rate limiting (global)  | `AppConfig.rateLimit`                       |
+| Rate limiting (route)   | `RouteConfig.rateLimit`                     |
+| Body-size limit         | `AppConfig.maxRequestBodyBytes` / `RouteConfig.maxBodyBytes` |
+| Request timeout         | `AppConfig.requestTimeout` / `RouteConfig.timeout` |
+| Content-type whitelist  | `RouteConfig.contentTypes` / `allowedContentTypesMiddleware` |
+| Error mapping           | always-on (HttpException, FormValidationException, EndpointException, DbErrorMapper, fallback) |
 | Server/X-Powered-By     | `AppConfig.serverHeader` / `poweredByHeader` |
 
 ### Per-route named middleware
@@ -230,21 +353,21 @@ Multiple annotations stack in declaration order.
 
 ### Error handling
 
-Any `HttpException` thrown inside a handler is automatically rendered as:
+The framework's error middleware (installed unconditionally - no need
+for any user-land `handleRequest` wrapper) maps:
 
-```json
-{
-  "error": {
-    "status": 404,
-    "code": "not_found",
-    "message": "User \"42\" not found"
-  }
-}
-```
+| Exception                  | Response                                |
+| -------------------------- | --------------------------------------- |
+| `HttpException` subclasses | `{error: {status, code, message}}` at the declared status code |
+| `FormValidationException`  | `400` with `{error: {…, details: {fieldName: msg, …}}}` |
+| `EndpointException`        | User-supplied status + body             |
+| Errors recognised by `AppConfig.dbErrorMapper` | Whatever the mapper returns |
+| Everything else            | `500 Internal Server Error` envelope    |
 
-Built-in subclasses: `BadRequest` (400), `Unauthorized` (401),
-`Forbidden` (403), `NotFound` (404), `Conflict` (409),
-`TooManyRequests` (429), `InternalServerError` (500).
+Built-in `HttpException` subclasses: `BadRequest` (400),
+`Unauthorized` (401), `Forbidden` (403), `NotFound` (404),
+`Conflict` (409), `TooManyRequests` (429),
+`InternalServerError` (500).
 
 ---
 
@@ -255,11 +378,15 @@ The generator picks a source for each method parameter in this order:
 1. An explicit annotation: `@Path`, `@Query`, `@Header`, `@Body`.
 2. A `RequestContext` parameter receives the framework-managed context.
 3. A `shelf.Request` parameter is passed through untouched.
-4. A parameter whose name matches a `{placeholder}` in the route path
+4. A `Form` subclass is bound from the request body via `bindForm`.
+5. A `Service` subclass is resolved via `ctx.service<T>()` (the
+   framework instantiates a fresh instance per request and attaches
+   `ctx` before injection).
+6. A parameter whose name matches a `{placeholder}` in the route path
    becomes a **path** parameter.
-5. A primitive (`String`, `int`, `double`, `num`, `bool`, `DateTime`)
+7. A primitive (`String`, `int`, `double`, `num`, `bool`, `DateTime`)
    becomes a **query** parameter.
-6. Anything else is the **request body** (at most one per method).
+8. Anything else is the **request body** (at most one per method).
    Decoded as JSON and hydrated via the type's `fromJson` factory if
    one exists; `List<T>` is walked element-by-element.
 
@@ -289,15 +416,37 @@ AppConfig({
   bool logResponseBody = false,
   Authenticator authenticator = const NullAuthenticator(),
   PermissionResolver permissionResolver = const ClaimsPermissionResolver(),
+  DatabaseProvider? database,             // null = no DB session middleware
+  DbErrorMapper? dbErrorMapper,           // null = no driver-specific mapping
   String requestIdHeader = 'X-Request-Id',
   CorsConfig? cors,                       // null = CORS disabled
-  RateLimitConfig? rateLimit,             // null = no rate limiting
+  RateLimitConfig? rateLimit,             // null = no global rate limiting
+  RouteConfig defaultRouteConfig = RouteConfig.empty,
   ErrorHandler? errorHandler,             // null = default 500
-  String serverHeader = 'gisila/0.1.0',
+  String serverHeader = 'gisila/0.2.0',
   bool poweredByHeader = true,
-  Duration? requestTimeout,               // null = no timeout
+  Duration? requestTimeout,               // null = no global timeout
   int? maxRequestBodyBytes,               // null = unlimited
   Map<String, Object?> extra = const {},
+})
+```
+
+### RouteConfig
+
+```dart
+RouteConfig({
+  RateLimitConfig? rateLimit,    // per-route rate limit
+  Duration? timeout,             // per-route timeout
+  int? maxBodyBytes,             // per-route body cap
+  Set<String>? contentTypes,     // per-route content-type whitelist
+  CorsConfig? cors,              // per-route CORS overrides
+  List<Middleware> middleware,   // extra per-route Shelf middleware
+  bool requireAuth = false,
+  Set<String> permissions    = {},   // ALL must be present
+  Set<String> anyPermission  = {},   // at least one
+  Set<String> roles          = {},   // at least one
+  int? statusCode,               // override success status
+  bool isPublic = false,         // disable all auth/permission checks
 })
 ```
 
@@ -329,18 +478,21 @@ RateLimitConfig({
 ## RequestContext
 
 Controller methods may accept a `RequestContext` as a parameter to
-access the authenticated principal, the request ID, and an open
-scratch-space for middleware:
+access the authenticated principal, the request ID, the per-request
+database session, the service resolver, and an open scratch-space for
+middleware:
 
 ```dart
 @Get('/me')
 @RequireAuth()
 Future<User> me(RequestContext ctx) async {
-  print(ctx.requestId);          // unique id from X-Request-Id
-  print(ctx.principal!.id);      // authenticated user id
-  print(ctx.isAuthenticated);    // true
-  print(ctx.extra['tenant']);    // app-level middleware can stash data here
-  return repo.find(ctx.principal!.id);
+  print(ctx.requestId);                 // unique id from X-Request-Id
+  print(ctx.principal!.id);             // authenticated user id
+  print(ctx.isAuthenticated);           // true
+  print(ctx.extra['tenant']);           // ad-hoc middleware data
+  final db = ctx.db<Database>();        // request-scoped DB session
+  final svc = ctx.service<UserService>(); // request-scoped service
+  return svc.find(ctx.principal!.id);
 }
 ```
 
@@ -356,9 +508,9 @@ dart run bin/server.dart
 
 # In another terminal:
 curl -H 'Authorization: Bearer reader-token' http://localhost:8080/users/me
-curl -X POST -H 'Authorization: Bearer writer-token' \
+curl -X POST \
   -H 'content-type: application/json' \
-  -d '{"name":"alice","email":"a@b.com"}' \
+  -d '{"name":"alice","email":"a@b.com","password":"hunter2!"}' \
   http://localhost:8080/users/
 ```
 

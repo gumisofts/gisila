@@ -1,6 +1,6 @@
 # Permissions and access control
 
-`gisila_web` makes "this route requires X" a one-liner. Every guard
+`gisila` makes "this route requires X" a one-liner. Every guard
 annotation is processed at build time by the same generator that
 emits the route wiring, so the check is **always** in front of your
 handler - you can't forget it.

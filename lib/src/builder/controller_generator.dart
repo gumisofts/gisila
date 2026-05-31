@@ -1,8 +1,23 @@
 /// `source_gen` Generator that turns each `@Controller` class into an
 /// extension method `attachToApp(GisilaApp app, Router router,
-/// {String prefix = ''})` that registers the routes on a `shelf_router`,
-/// honouring class- and method-level permission / middleware
-/// annotations.
+/// {String prefix = ''})` that registers every annotated route via
+/// the new `gisilaRoute(...)` runtime helper.
+///
+/// Each generated registration:
+///
+/// * builds the effective [RouteConfig] by merging
+///   `AppConfig.defaultRouteConfig` ← `@UseRouteConfig` class config
+///   ← annotation-derived guards (`@RequireAuth`, `@Permissions`, …)
+///   ← method-level `config:` ← named middleware list (`@UseMiddleware`),
+/// * binds path / query / header / body / [Form] / [Service] /
+///   [RequestContext] / `Request` parameters from the request,
+/// * calls the user method and converts the return value to a
+///   [Response] (or returns it as-is when the method already returns
+///   one).
+///
+/// Crucially, the generated handler **does not** contain inline
+/// `guardRequest(...)` calls anymore; AuthN/AuthZ is moved into a
+/// per-route middleware that `gisilaRoute` composes for us.
 library gisila.builder.controller_generator;
 
 import 'package:analyzer/dart/constant/value.dart';
@@ -12,10 +27,21 @@ import 'package:build/build.dart';
 import 'package:source_gen/source_gen.dart';
 
 import '../annotations/controller.dart';
+import 'route_config_literal.dart';
 import 'utils.dart';
 
 /// Where a method parameter is sourced from.
-enum _Source { path, query, header, body, request, context, none }
+enum _Source {
+  path,
+  query,
+  header,
+  body,
+  request,
+  context,
+  form,
+  service,
+  none,
+}
 
 class ControllerGenerator extends GeneratorForAnnotation<Controller> {
   const ControllerGenerator();
@@ -37,6 +63,7 @@ class ControllerGenerator extends GeneratorForAnnotation<Controller> {
     final controllerPrefix = annotation.read('path').stringValue;
     final classGuards = _readGuards(cls.metadata);
     final classMiddleware = _readMiddlewareNames(cls.metadata);
+    final classRouteConfig = _readUseRouteConfig(cls.metadata);
 
     final routeBlocks = <String>[];
     for (final method in cls.methods) {
@@ -49,12 +76,13 @@ class ControllerGenerator extends GeneratorForAnnotation<Controller> {
         controllerPrefix: controllerPrefix,
         classGuards: classGuards,
         classMiddleware: classMiddleware,
+        classRouteConfig: classRouteConfig,
       ));
     }
 
     if (routeBlocks.isEmpty) {
       log.warning(
-        'gisila_orm: ${cls.name} is annotated with @Controller but has '
+        'gisila: ${cls.name} is annotated with @Controller but has '
         'no methods carrying @Get/@Post/... ; skipping.',
       );
       return '';
@@ -62,13 +90,14 @@ class ControllerGenerator extends GeneratorForAnnotation<Controller> {
 
     final buffer = StringBuffer()
       ..writeln('// **************************************************')
-      ..writeln('// gisila_orm: generated for ${cls.name}')
+      ..writeln('// gisila: generated for ${cls.name}')
       ..writeln('// **************************************************')
       ..writeln()
       ..writeln('extension ${cls.name}GisilaWeb on ${cls.name} {')
       ..writeln('  /// Registers every annotated route of this controller on')
-      ..writeln('  /// [router] using [app] for authentication, permission')
-      ..writeln('  /// checks, named middleware lookup, and logging.')
+      ..writeln('  /// [router] using [app] for service resolution, named')
+      ..writeln('  /// middleware lookup, authentication, permission checks,')
+      ..writeln('  /// per-route configuration and error handling.')
       ..writeln('  ///')
       ..writeln('  /// Pass [prefix] to mount the controller under an extra')
       ..writeln('  /// path segment (e.g. an `/api/v1` versioning prefix).')
@@ -95,6 +124,7 @@ class ControllerGenerator extends GeneratorForAnnotation<Controller> {
     required String controllerPrefix,
     required _Guards classGuards,
     required List<String> classMiddleware,
+    required DartObject? classRouteConfig,
   }) {
     final fullPath = joinPath(controllerPrefix, route.path);
     final shelfPath = toShelfPath(fullPath);
@@ -113,6 +143,7 @@ class ControllerGenerator extends GeneratorForAnnotation<Controller> {
     );
 
     final wantsContext = paramInfos.any((p) => p.source == _Source.context);
+    final wantsRequest = paramInfos.any((p) => p.source == _Source.request);
 
     final argExprs = <String>[];
     final namedArgExprs = <String>[];
@@ -121,19 +152,28 @@ class ControllerGenerator extends GeneratorForAnnotation<Controller> {
     for (final pi in paramInfos) {
       switch (pi.source) {
         case _Source.request:
-          if (pi.parameter.isNamed) {
-            namedArgExprs.add('${pi.parameter.name}: request');
-          } else {
-            argExprs.add('request');
-          }
+          _appendArgWith(argExprs, namedArgExprs, pi, 'request');
           break;
 
         case _Source.context:
-          if (pi.parameter.isNamed) {
-            namedArgExprs.add('${pi.parameter.name}: ctx');
-          } else {
-            argExprs.add('ctx');
-          }
+          _appendArgWith(argExprs, namedArgExprs, pi, 'ctx');
+          break;
+
+        case _Source.form:
+          final typeName = typeDisplayName(pi.parameter.type);
+          extractStatements.add(
+            'final ${pi.parameter.name} = '
+            'await bindForm(request, $typeName.new);',
+          );
+          _appendArg(argExprs, namedArgExprs, pi);
+          break;
+
+        case _Source.service:
+          final typeName = typeDisplayName(pi.parameter.type);
+          extractStatements.add(
+            'final ${pi.parameter.name} = ctx.service<$typeName>();',
+          );
+          _appendArg(argExprs, namedArgExprs, pi);
           break;
 
         case _Source.path:
@@ -175,9 +215,10 @@ class ControllerGenerator extends GeneratorForAnnotation<Controller> {
 
         case _Source.none:
           throw InvalidGenerationSourceError(
-            'gisila_orm: could not classify parameter "${pi.parameter.name}" '
+            'gisila: could not classify parameter "${pi.parameter.name}" '
             'of ${cls.name}.${method.name}. Annotate it with @Path, @Query, '
-            '@Header or @Body, or remove it.',
+            '@Header or @Body, declare it as a Form / Service subtype, '
+            'or remove it.',
             element: pi.parameter,
           );
       }
@@ -200,58 +241,76 @@ class ControllerGenerator extends GeneratorForAnnotation<Controller> {
         ? ''
         : '${extractStatements.join('\n          ')}\n          ';
 
-    String handlerBody;
+    final successStatus = route.successStatus;
+
+    String returnStmt;
     if (returnsResponse) {
-      handlerBody = '''${extractBlock}final response = await $callArgs;
+      returnStmt = '''final response = await $callArgs;
           return response;''';
     } else if (returnsVoid) {
-      handlerBody = '''${extractBlock}await $callArgs;
-          return emptyResponse(statusCode: ${route.successStatus});''';
+      returnStmt = '''await $callArgs;
+          return emptyResponse(statusCode: $successStatus);''';
     } else {
-      handlerBody = '''${extractBlock}final result = await $callArgs;
-          return jsonResponse(body: result, statusCode: ${route.successStatus});''';
+      returnStmt = '''final result = await $callArgs;
+          return jsonResponse(body: result, statusCode: $successStatus);''';
     }
 
-    // ---------- guard literal ----------
-    final guardExpr = '''await guardRequest(
-          request,
-          requireAuth: ${effectiveGuards.requireAuth},
-          permissions: ${stringSetLiteral(effectiveGuards.permissions)},
-          anyPermission: ${stringSetLiteral(effectiveGuards.anyPermission)},
-          roles: ${stringSetLiteral(effectiveGuards.roles)},
-        )''';
+    // Only materialise the `request` alias when extraction statements
+    // (or the controller itself via _Source.request) actually refer
+    // to it. The handler closure already receives `ctx`.
+    final requestRefRe = RegExp(r'\brequest\b');
+    final needsRequest =
+        wantsRequest || extractStatements.any((s) => requestRefRe.hasMatch(s));
+    final requestAlias =
+        needsRequest ? 'final request = ctx.request;\n          ' : '';
+    // Suppress unused-warning lint emission when the controller does
+    // not declare a `ctx` parameter and no extract block touches it.
+    if (wantsContext) {/* ctx is consumed by the user method */}
 
-    // ---------- middleware chain ----------
-    final mwNames = <String>{...classMiddleware, ...methodMiddleware}.toList();
-    final mwInstallation = mwNames.isEmpty
-        ? ''
-        : '''
-      final __handler = const Pipeline()
-          ${mwNames.map((n) => '.addMiddleware(app.namedMiddleware(${dartString(n)}))').join('\n          ')}
-          .addHandler(__inner);
-      router.${route.method.toLowerCase()}(basePath, __handler);
-''';
+    // ---------- route config literal ----------
+    final classConfigLiteral = emitRouteConfigLiteral(classRouteConfig);
+    final guardsConfigLiteral = emitGuardsRouteConfigLiteral(
+      requireAuth: effectiveGuards.requireAuth,
+      permissions: effectiveGuards.permissions,
+      anyPermission: effectiveGuards.anyPermission,
+      roles: effectiveGuards.roles,
+      isPublic: effectiveGuards.isPublic,
+    );
+    final methodConfigLiteral = emitRouteConfigLiteral(route.config);
 
-    final registerLine = mwNames.isEmpty
-        ? 'router.${route.method.toLowerCase()}(basePath, __inner);'
-        : mwInstallation;
+    final mergedNamedMw = <String>{...classMiddleware, ...methodMiddleware};
+    final namedMwConfigLiteral = emitNamedMiddlewareConfig(mergedNamedMw);
+
+    final mergeChain = StringBuffer(classConfigLiteral);
+    if (guardsConfigLiteral != 'RouteConfig.empty') {
+      mergeChain.write('.merge($guardsConfigLiteral)');
+    }
+    if (methodConfigLiteral != 'RouteConfig.empty') {
+      mergeChain.write('.merge($methodConfigLiteral)');
+    }
+    if (namedMwConfigLiteral != null) {
+      mergeChain.write('.merge($namedMwConfigLiteral)');
+    }
+
+    final cfgExpr = mergeChain.toString();
 
     return '''
     {
       final basePath = '\$prefix$shelfPath';
-      Future<Response> __inner(Request request) async {
-        try {
-          final __guardResult = $guardExpr;
-          if (__guardResult is Response) return __guardResult;
-          ${wantsContext ? 'final ctx = __guardResult as RequestContext;' : ''}
-          $handlerBody
-        } on TypeError catch (e) {
-          throw BadRequestException('Invalid request payload (\$e)');
-        } on FormatException catch (e) {
-          throw BadRequestException('Invalid request format: \${e.message}');
-        }
-      }
-      $registerLine
+      final RouteConfig __cfg = $cfgExpr;
+      router.${route.method.toLowerCase()}(basePath, gisilaRoute(
+        app: app,
+        config: __cfg,
+        handler: (RequestContext ctx) async {
+          try {
+            $requestAlias$extractBlock$returnStmt
+          } on TypeError catch (e) {
+            throw BadRequestException('Invalid request payload (\$e)');
+          } on FormatException catch (e) {
+            throw BadRequestException('Invalid request format: \${e.message}');
+          }
+        },
+      ));
     }''';
   }
 
@@ -260,10 +319,19 @@ class ControllerGenerator extends GeneratorForAnnotation<Controller> {
     List<String> named,
     _ParamInfo pi,
   ) {
+    _appendArgWith(positional, named, pi, pi.parameter.name);
+  }
+
+  void _appendArgWith(
+    List<String> positional,
+    List<String> named,
+    _ParamInfo pi,
+    String value,
+  ) {
     if (pi.parameter.isNamed) {
-      named.add('${pi.parameter.name}: ${pi.parameter.name}');
+      named.add('${pi.parameter.name}: $value');
     } else {
-      positional.add(pi.parameter.name);
+      positional.add(value);
     }
   }
 
@@ -275,6 +343,7 @@ class ControllerGenerator extends GeneratorForAnnotation<Controller> {
     String? httpMethod;
     String? path;
     int successStatus = 200;
+    DartObject? config;
     for (final m in method.metadata) {
       final value = m.computeConstantValue();
       if (value == null) continue;
@@ -286,6 +355,10 @@ class ControllerGenerator extends GeneratorForAnnotation<Controller> {
       httpMethod = r.peek('method')?.stringValue;
       path = r.peek('path')?.stringValue;
       successStatus = r.peek('statusCode')?.intValue ?? 200;
+      final cfg = r.peek('config');
+      if (cfg != null && !cfg.isNull) {
+        config = cfg.objectValue;
+      }
       break;
     }
     if (httpMethod == null || path == null) return null;
@@ -293,6 +366,7 @@ class ControllerGenerator extends GeneratorForAnnotation<Controller> {
       method: httpMethod,
       path: path,
       successStatus: successStatus,
+      config: config,
     );
   }
 
@@ -308,6 +382,22 @@ class ControllerGenerator extends GeneratorForAnnotation<Controller> {
       c = superElement is ClassElement ? superElement : null;
     }
     return false;
+  }
+
+  /// Reads the (optional) class-level `@UseRouteConfig(config)`.
+  DartObject? _readUseRouteConfig(List<ElementAnnotation> metadata) {
+    for (final m in metadata) {
+      final value = m.computeConstantValue();
+      if (value == null) continue;
+      final type = value.type;
+      final element = type?.element;
+      if (element is! ClassElement) continue;
+      if (element.name != 'UseRouteConfig') continue;
+      if (!element.library.identifier.contains('gisila')) continue;
+      final cfg = value.getField('config');
+      if (cfg != null && !cfg.isNull) return cfg;
+    }
+    return null;
   }
 
   _Guards _readGuards(List<ElementAnnotation> metadata) {
@@ -427,6 +517,18 @@ class ControllerGenerator extends GeneratorForAnnotation<Controller> {
       if (isRequestContext(p.type)) {
         infos.add(
             _ParamInfo(parameter: p, source: _Source.context, apiName: p.name));
+        continue;
+      }
+
+      if (isFormSubtype(p.type)) {
+        infos.add(
+            _ParamInfo(parameter: p, source: _Source.form, apiName: p.name));
+        continue;
+      }
+
+      if (isServiceSubtype(p.type)) {
+        infos.add(
+            _ParamInfo(parameter: p, source: _Source.service, apiName: p.name));
         continue;
       }
 
@@ -632,10 +734,12 @@ class _RouteMeta {
     required this.method,
     required this.path,
     required this.successStatus,
+    this.config,
   });
   final String method;
   final String path;
   final int successStatus;
+  final DartObject? config;
 }
 
 class _ParamInfo {

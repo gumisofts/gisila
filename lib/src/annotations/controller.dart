@@ -3,9 +3,16 @@
 /// These annotations are intentionally small and free-standing so user
 /// code stays readable; the generator infers as much as it can from
 /// parameter names and types.
+///
+/// Every route annotation accepts a `config: RouteConfig?` parameter
+/// for per-route rate limiting, timeout, body size, content-type
+/// whitelist, custom middleware, and declarative permissions. See
+/// [RouteConfig] for the full list.
 library gisila.annotations.controller;
 
 import 'package:meta/meta_meta.dart';
+
+import '../runtime/route_config.dart';
 
 /// Marks a class as a gisila controller.
 ///
@@ -23,6 +30,26 @@ class Controller {
   final String path;
 }
 
+/// Applies a [RouteConfig] to every route in the annotated controller.
+///
+/// Method-level `config:` on individual route annotations is merged on
+/// top of this class-level config; the class-level config is in turn
+/// merged on top of `AppConfig.defaultRouteConfig`.
+///
+/// ```dart
+/// @Controller('/admin')
+/// @UseRouteConfig(RouteConfig(
+///   rateLimit: RateLimitConfig(requestsPerMinute: 30),
+///   timeout: Duration(seconds: 3),
+/// ))
+/// class AdminController { ... }
+/// ```
+@Target({TargetKind.classType})
+class UseRouteConfig {
+  const UseRouteConfig(this.config);
+  final RouteConfig config;
+}
+
 /// Common base for HTTP-method annotations placed on controller methods.
 ///
 /// The generator never instantiates [Route] directly; concrete
@@ -34,6 +61,7 @@ class Route {
     this.path, {
     this.statusCode = 200,
     this.contentType = 'application/json',
+    this.config,
   });
 
   final String method;
@@ -47,6 +75,11 @@ class Route {
 
   /// Content-type emitted for JSON-encoded responses.
   final String contentType;
+
+  /// Per-route configuration overlay. Merged on top of
+  /// `AppConfig.defaultRouteConfig` and any class-level
+  /// `@UseRouteConfig`.
+  final RouteConfig? config;
 }
 
 class Get extends Route {
@@ -54,7 +87,14 @@ class Get extends Route {
     String path, {
     int statusCode = 200,
     String contentType = 'application/json',
-  }) : super('GET', path, statusCode: statusCode, contentType: contentType);
+    RouteConfig? config,
+  }) : super(
+          'GET',
+          path,
+          statusCode: statusCode,
+          contentType: contentType,
+          config: config,
+        );
 }
 
 class Post extends Route {
@@ -62,7 +102,14 @@ class Post extends Route {
     String path, {
     int statusCode = 201,
     String contentType = 'application/json',
-  }) : super('POST', path, statusCode: statusCode, contentType: contentType);
+    RouteConfig? config,
+  }) : super(
+          'POST',
+          path,
+          statusCode: statusCode,
+          contentType: contentType,
+          config: config,
+        );
 }
 
 class Put extends Route {
@@ -70,7 +117,14 @@ class Put extends Route {
     String path, {
     int statusCode = 200,
     String contentType = 'application/json',
-  }) : super('PUT', path, statusCode: statusCode, contentType: contentType);
+    RouteConfig? config,
+  }) : super(
+          'PUT',
+          path,
+          statusCode: statusCode,
+          contentType: contentType,
+          config: config,
+        );
 }
 
 class Patch extends Route {
@@ -78,7 +132,14 @@ class Patch extends Route {
     String path, {
     int statusCode = 200,
     String contentType = 'application/json',
-  }) : super('PATCH', path, statusCode: statusCode, contentType: contentType);
+    RouteConfig? config,
+  }) : super(
+          'PATCH',
+          path,
+          statusCode: statusCode,
+          contentType: contentType,
+          config: config,
+        );
 }
 
 class Delete extends Route {
@@ -86,15 +147,28 @@ class Delete extends Route {
     String path, {
     int statusCode = 204,
     String contentType = 'application/json',
-  }) : super('DELETE', path, statusCode: statusCode, contentType: contentType);
+    RouteConfig? config,
+  }) : super(
+          'DELETE',
+          path,
+          statusCode: statusCode,
+          contentType: contentType,
+          config: config,
+        );
 }
 
 class Head extends Route {
-  const Head(String path, {int statusCode = 200})
-      : super('HEAD', path, statusCode: statusCode);
+  const Head(
+    String path, {
+    int statusCode = 200,
+    RouteConfig? config,
+  }) : super('HEAD', path, statusCode: statusCode, config: config);
 }
 
 class Options extends Route {
-  const Options(String path, {int statusCode = 204})
-      : super('OPTIONS', path, statusCode: statusCode);
+  const Options(
+    String path, {
+    int statusCode = 204,
+    RouteConfig? config,
+  }) : super('OPTIONS', path, statusCode: statusCode, config: config);
 }

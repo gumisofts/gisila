@@ -1,6 +1,6 @@
 # Logging
 
-`gisila_web` ships with a small structured-logging stack: a `Logger`
+`gisila` ships with a small structured-logging stack: a `Logger`
 interface, a default `ConsoleLogger` that supports plain-text and JSON
 output, and a per-request middleware that emits one log record per
 HTTP request.
@@ -41,7 +41,7 @@ That's it. You get one record per request, plus startup messages,
 plus any error that escapes your handlers.
 
 ```
-2026-05-22T14:01:00Z [INFO ] gisila_web listening on http://0.0.0.0:8080 ...
+2026-05-22T14:01:00Z [INFO ] gisila listening on http://0.0.0.0:8080 ...
 2026-05-22T14:01:05Z [INFO ] req=f1q...  user=u1  GET /users/me -> 200 (3ms) ...
 2026-05-22T14:01:09Z [WARN ] req=f7k...                POST /tasks  -> 422 (12ms) ...
 2026-05-22T14:01:12Z [ERROR] req=...     user=u9  Unhandled exception in handler error=Bad State ...
@@ -260,7 +260,7 @@ class FileLogger extends Logger {
 
 final app = GisilaApp(
   config: AppConfig(
-    logger: FileLogger(File('/var/log/gisila_web.log')),
+    logger: FileLogger(File('/var/log/gisila.log')),
   ),
 );
 ```

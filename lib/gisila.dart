@@ -59,10 +59,17 @@ export 'src/runtime/app.dart';
 export 'src/runtime/auth/authenticator.dart';
 export 'src/runtime/auth/permission_resolver.dart';
 export 'src/runtime/auth/principal.dart';
+// Cache layer: pluggable backend (Redis, Memcached, in-memory, …).
+export 'src/runtime/cache/cache_middleware.dart' show kCacheKey;
+export 'src/runtime/cache/cache_provider.dart';
+export 'src/runtime/cache/in_memory_cache_provider.dart';
 export 'src/runtime/codec.dart'
     show BadRequestException, coerce, emptyResponse, jsonResponse, readJsonBody;
 export 'src/runtime/config.dart';
 export 'src/runtime/context.dart';
+export 'src/runtime/db/database_provider.dart';
+export 'src/runtime/db/db_error_mapper.dart';
+export 'src/runtime/db/db_session_middleware.dart' show kDbKey;
 export 'src/runtime/exceptions.dart';
 export 'src/runtime/logging/log_event.dart';
 export 'src/runtime/logging/logger.dart';
@@ -70,6 +77,11 @@ export 'src/runtime/middleware/content_type.dart';
 export 'src/runtime/middleware/cors.dart';
 export 'src/runtime/middleware/rate_limit.dart';
 export 'src/runtime/middleware/request_id.dart';
+// Per-route configuration.
+export 'src/runtime/route_config.dart';
+export 'src/runtime/route_runtime.dart' show GisilaRouteHandler, gisilaRoute;
+// Service layer.
+export 'src/runtime/service.dart';
 // Content-type-aware body parsing.
 export 'src/runtime/parsers/body_parser.dart'
     show DecodedBody, readBody, readFormBody;
@@ -81,13 +93,20 @@ export 'src/runtime/parsers/form_data.dart'
         multipartFormDataContentType,
         parseFormData;
 export 'src/runtime/route_guard.dart';
-// Form field validation.
+// Typed Form / FormField input validation.
 export 'src/runtime/forms.dart'
     show
-        EmailVerifier,
-        Field,
-        FieldValidationException,
+        BoolField,
+        DateTimeField,
+        DoubleField,
+        EmailField,
         FieldValidator,
-        emailFieldValidator,
-        form,
-        nameFieldValidator;
+        FileField,
+        Form,
+        FormField,
+        FormValidationException,
+        IntField,
+        JsonField,
+        PasswordField,
+        StringField,
+        bindForm;

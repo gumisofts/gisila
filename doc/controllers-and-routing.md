@@ -1,6 +1,6 @@
 # Controllers and routing
 
-`gisila_web` keeps controllers small and almost free of plumbing. The
+`gisila` keeps controllers small and almost free of plumbing. The
 build-time generator translates each `@Controller` class into an
 extension method that registers routes on a `shelf_router`, decodes
 parameters, calls the configured permission guards, invokes your
@@ -34,7 +34,7 @@ arguments (use them for dependency injection), instance state, and
 any number of route methods.
 
 ```dart
-import 'package:gisila_web/gisila_web.dart';
+import 'package:gisila/gisila.dart';
 
 part 'users_controller.g.dart';
 
@@ -462,7 +462,7 @@ paths disjoint or use prefixes.
   one, or a custom-typed parameter that should be path/query/header.
   Annotate explicitly.
 * **"params getter not defined for Request"** - you're missing the
-  re-exported `package:gisila_web/gisila_web.dart` import in the
+  re-exported `package:gisila/gisila.dart` import in the
   controller file (or you imported `shelf` directly without
   `shelf_router`).
 * **Old `.g.dart` file** - if you renamed or removed a route, re-run

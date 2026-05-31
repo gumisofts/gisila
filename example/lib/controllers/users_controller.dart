@@ -1,6 +1,17 @@
+/// Thin users controller.
+///
+/// Every method's signature reads like a function: typed `Form`
+/// parameter (input validation + cleaning), typed `Service` parameter
+/// (business logic + persistence), optional `RequestContext` (for
+/// principal / requestId / DB session access). No raw `Request`, no
+/// inline permission checks, no `handleRequest(...)` wrapper.
+library;
+
 import 'package:gisila/gisila.dart';
 
+import '../forms/user_forms.dart';
 import '../models/user.dart';
+import '../services/user_service.dart';
 
 part 'users_controller.g.dart';
 
@@ -9,25 +20,61 @@ part 'users_controller.g.dart';
 class UsersController {
   UsersController();
 
-  final Map<String, User> _store = <String, User>{};
-
-  /// Public health-check exposed under the `/users` prefix even though
-  /// the controller demands auth.
+  /// Public health check exposed under the auth-protected controller
+  /// thanks to `@Public()`.
   @Get('/ping')
   @Public()
   Future<Map<String, Object?>> ping() async =>
       <String, Object?>{'status': 'ok', 'service': 'users'};
 
-  @Get('/')
+  /// Per-route rate limit + typed query params.
+  @Get(
+    '/',
+    config: RouteConfig(
+      rateLimit: RateLimitConfig(requestsPerMinute: 60),
+    ),
+  )
   @Permissions({'users:read'})
-  Future<List<User>> listUsers({int? limit, int? offset}) async {
-    final all = _store.values.toList();
-    final start = offset ?? 0;
-    final end =
-        limit == null ? all.length : (start + limit).clamp(0, all.length);
-    return all.sublist(start.clamp(0, all.length), end);
+  Future<List<User>> listUsers(
+    UserService users, {
+    int? limit,
+    int? offset,
+  }) {
+    return users.list(limit: limit, offset: offset);
   }
 
+  /// Public registration with per-route rate limit and the typed form
+  /// pattern. No `Request`, no manual body parsing.
+  @Post(
+    '/',
+    config: RouteConfig(
+      rateLimit: RateLimitConfig(requestsPerMinute: 30),
+    ),
+  )
+  @Public()
+  Future<User> register(RegisterForm form, UserService users) {
+    return users.register(
+      email: form.email.value!,
+      password: form.password.value!,
+      name: form.name.value!,
+    );
+  }
+
+  /// JSON or form-urlencoded login. The same [LoginForm] handles both.
+  @Post('/login')
+  @Public()
+  Future<Map<String, Object?>> login(LoginForm form, UserService users) async {
+    final user = await users.login(
+      email: form.email.value!,
+      password: form.password.value!,
+    );
+    return <String, Object?>{
+      'user': user.toJson(),
+      'remember': form.remember.value ?? false,
+    };
+  }
+
+  /// Reads the principal off the [RequestContext].
   @Get('/me')
   Future<Map<String, Object?>> me(RequestContext ctx) async {
     final p = ctx.principal!;
@@ -41,65 +88,19 @@ class UsersController {
 
   @Get('/{id}')
   @Permissions({'users:read'})
-  Future<User> getUser(String id) async {
-    final u = _store[id];
-    if (u == null) throw NotFound('User "$id" not found');
-    return u;
-  }
+  Future<User> getUser(String id, UserService users) => users.getById(id);
 
-  @Post('/')
+  @Patch('/{id}')
   @Permissions({'users:write'})
-  Future<User> createUser(CreateUser body) async {
-    final id = (_store.length + 1).toString();
-    final user = User(
-      id: id,
-      name: body.name,
-      email: body.email,
-      roles: body.roles,
-    );
-    _store[id] = user;
-    return user;
-  }
-
-  /// Accepts both `application/x-www-form-urlencoded` and JSON because
-  /// the `LoginForm` class exposes both a `fromForm` and a `fromJson`
-  /// factory. The generator picks `fromForm` when present.
-  @Post('/login')
-  @Public()
-  Future<Map<String, Object?>> login(LoginForm body) async => <String, Object?>{
-        'username': body.username,
-        'remember': body.remember,
-      };
-
-  /// Multipart upload demo. The `file` parameter is automatically
-  /// extracted by name from the form's files map; the optional `note`
-  /// field is read from the same FormData via the JSON-shaped Map.
-  @Post('/{id}/avatar')
-  @Permissions({'users:write'})
-  Future<Map<String, Object?>> uploadAvatar(
+  Future<User> updateUser(
     String id,
-    UploadedFile file,
-  ) async {
-    final bytes = await file.readAsBytes();
-    return <String, Object?>{
-      'id': id,
-      'filename': file.name,
-      'contentType': file.contentType.mimeType,
-      'size': bytes.length,
-    };
+    UpdateUserForm form,
+    UserService users,
+  ) {
+    return users.update(id, name: form.name.value, email: form.email.value);
   }
 
   @Delete('/{id}')
   @AnyPermission({'admin', 'users:write'})
-  Future<void> deleteUser(String id) async {
-    if (!_store.containsKey(id)) throw NotFound('User "$id" not found');
-    _store.remove(id);
-  }
-
-  @Get('/admin/audit')
-  @Roles({'admin'})
-  Future<Map<String, Object?>> audit() async => <String, Object?>{
-        'count': _store.length,
-        'ids': _store.keys.toList(),
-      };
+  Future<void> deleteUser(String id, UserService users) => users.delete(id);
 }

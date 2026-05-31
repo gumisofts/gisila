@@ -69,6 +69,29 @@ bool isUploadedFile(DartType type) {
       element.library.identifier.startsWith('package:gisila/');
 }
 
+bool _isSubtypeOf(DartType type, String className) {
+  final element = type.element;
+  if (element is! ClassElement) return false;
+  ClassElement? cursor = element;
+  while (cursor != null) {
+    if (cursor.name == className &&
+        cursor.library.identifier.startsWith('package:gisila/')) {
+      return true;
+    }
+    final superType = cursor.supertype;
+    if (superType == null) break;
+    final superElement = superType.element;
+    cursor = superElement is ClassElement ? superElement : null;
+  }
+  return false;
+}
+
+/// True iff [type] is (a subclass of) the gisila `Form` class.
+bool isFormSubtype(DartType type) => _isSubtypeOf(type, 'Form');
+
+/// True iff [type] is (a subclass of) the gisila `Service` class.
+bool isServiceSubtype(DartType type) => _isSubtypeOf(type, 'Service');
+
 DartType unwrapFuture(DartType type) {
   if (type is InterfaceType &&
       type.element.name == 'Future' &&

@@ -1,6 +1,6 @@
 # Error handling
 
-`gisila_web` aims for a single rule: **never write an error response
+`gisila` aims for a single rule: **never write an error response
 by hand**. Throw a typed exception; the framework renders it.
 
 The result is a uniform JSON envelope across every endpoint and every

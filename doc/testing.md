@@ -1,6 +1,6 @@
 # Testing
 
-Controllers built with `gisila_web` are easy to test without booting
+Controllers built with `gisila` are easy to test without booting
 a real HTTP server. You can exercise the full pipeline - including
 the authentication guard and any named middleware - against an
 in-memory `Handler`, and assert on the resulting `Response` directly.
@@ -58,7 +58,7 @@ To exercise routing, body decoding, error mapping, and guards in one
 go, build a `Handler` by hand:
 
 ```dart
-import 'package:gisila_web/gisila_web.dart';
+import 'package:gisila/gisila.dart';
 import 'package:test/test.dart';
 
 import 'package:my_app/controllers/users_controller.dart';

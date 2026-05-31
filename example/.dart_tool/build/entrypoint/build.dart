@@ -3,7 +3,7 @@
 // build_runner >=2.4.16
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:build_runner_core/build_runner_core.dart' as _i1;
-import 'package:gisila_web/builder.dart' as _i2;
+import 'package:gisila/builder.dart' as _i2;
 import 'package:source_gen/builder.dart' as _i3;
 import 'dart:isolate' as _i4;
 import 'package:build_runner/src/build_script_generate/build_process_state.dart'
@@ -13,9 +13,9 @@ import 'dart:io' as _i7;
 
 final _builders = <_i1.BuilderApplication>[
   _i1.apply(
-    r'gisila_web:gisila_web',
+    r'gisila:gisila',
     [_i2.controllerBuilder],
-    _i1.toDependentsOf(r'gisila_web'),
+    _i1.toDependentsOf(r'gisila'),
     hideOutput: true,
     appliesBuilders: const [r'source_gen:combining_builder'],
   ),
