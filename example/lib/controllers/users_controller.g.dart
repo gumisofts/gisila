@@ -33,15 +33,8 @@ extension UsersControllerGisilaWeb on UsersController {
             app: app,
             config: __cfg,
             handler: (RequestContext ctx) async {
-              try {
-                final result = await this.ping();
-                return jsonResponse(body: result, statusCode: 200);
-              } on TypeError catch (e) {
-                throw BadRequestException('Invalid request payload ($e)');
-              } on FormatException catch (e) {
-                throw BadRequestException(
-                    'Invalid request format: ${e.message}');
-              }
+              final result = await this.ping();
+              return jsonResponse(body: result, statusCode: 200);
             },
           ));
     }
@@ -58,24 +51,27 @@ extension UsersControllerGisilaWeb on UsersController {
             app: app,
             config: __cfg,
             handler: (RequestContext ctx) async {
-              try {
-                final request = ctx.request;
-                final users = ctx.service<UserService>();
-                final limit = coerce<int?>(
-                    request.url.queryParameters['limit'], 'limit',
-                    required: false);
-                final offset = coerce<int?>(
-                    request.url.queryParameters['offset'], 'offset',
-                    required: false);
-                final result =
-                    await this.listUsers(users, limit: limit, offset: offset);
-                return jsonResponse(body: result, statusCode: 200);
-              } on TypeError catch (e) {
-                throw BadRequestException('Invalid request payload ($e)');
-              } on FormatException catch (e) {
-                throw BadRequestException(
-                    'Invalid request format: ${e.message}');
-              }
+              final request = ctx.request;
+              final (users, limit, offset) = await (() async {
+                try {
+                  final users = ctx.service<UserService>();
+                  final limit = coerce<int?>(
+                      request.url.queryParameters['limit'], 'limit',
+                      required: false);
+                  final offset = coerce<int?>(
+                      request.url.queryParameters['offset'], 'offset',
+                      required: false);
+                  return (users, limit, offset);
+                } on TypeError catch (e) {
+                  throw BadRequestException('Invalid request payload ($e)');
+                } on FormatException catch (e) {
+                  throw BadRequestException(
+                      'Invalid request format: ${e.message}');
+                }
+              })();
+              final result =
+                  await this.listUsers(users, limit: limit, offset: offset);
+              return jsonResponse(body: result, statusCode: 200);
             },
           ));
     }
@@ -91,18 +87,21 @@ extension UsersControllerGisilaWeb on UsersController {
             app: app,
             config: __cfg,
             handler: (RequestContext ctx) async {
-              try {
-                final request = ctx.request;
-                final form = await bindForm(request, RegisterForm.new);
-                final users = ctx.service<UserService>();
-                final result = await this.register(form, users);
-                return jsonResponse(body: result, statusCode: 201);
-              } on TypeError catch (e) {
-                throw BadRequestException('Invalid request payload ($e)');
-              } on FormatException catch (e) {
-                throw BadRequestException(
-                    'Invalid request format: ${e.message}');
-              }
+              final request = ctx.request;
+              final (form, users) = await (() async {
+                try {
+                  final form = await bindForm(request, RegisterForm.new);
+                  final users = ctx.service<UserService>();
+                  return (form, users);
+                } on TypeError catch (e) {
+                  throw BadRequestException('Invalid request payload ($e)');
+                } on FormatException catch (e) {
+                  throw BadRequestException(
+                      'Invalid request format: ${e.message}');
+                }
+              })();
+              final result = await this.register(form, users);
+              return jsonResponse(body: result, statusCode: 201);
             },
           ));
     }
@@ -116,18 +115,21 @@ extension UsersControllerGisilaWeb on UsersController {
             app: app,
             config: __cfg,
             handler: (RequestContext ctx) async {
-              try {
-                final request = ctx.request;
-                final form = await bindForm(request, LoginForm.new);
-                final users = ctx.service<UserService>();
-                final result = await this.login(form, users);
-                return jsonResponse(body: result, statusCode: 201);
-              } on TypeError catch (e) {
-                throw BadRequestException('Invalid request payload ($e)');
-              } on FormatException catch (e) {
-                throw BadRequestException(
-                    'Invalid request format: ${e.message}');
-              }
+              final request = ctx.request;
+              final (form, users) = await (() async {
+                try {
+                  final form = await bindForm(request, LoginForm.new);
+                  final users = ctx.service<UserService>();
+                  return (form, users);
+                } on TypeError catch (e) {
+                  throw BadRequestException('Invalid request payload ($e)');
+                } on FormatException catch (e) {
+                  throw BadRequestException(
+                      'Invalid request format: ${e.message}');
+                }
+              })();
+              final result = await this.login(form, users);
+              return jsonResponse(body: result, statusCode: 201);
             },
           ));
     }
@@ -141,15 +143,8 @@ extension UsersControllerGisilaWeb on UsersController {
             app: app,
             config: __cfg,
             handler: (RequestContext ctx) async {
-              try {
-                final result = await this.me(ctx);
-                return jsonResponse(body: result, statusCode: 200);
-              } on TypeError catch (e) {
-                throw BadRequestException('Invalid request payload ($e)');
-              } on FormatException catch (e) {
-                throw BadRequestException(
-                    'Invalid request format: ${e.message}');
-              }
+              final result = await this.me(ctx);
+              return jsonResponse(body: result, statusCode: 200);
             },
           ));
     }
@@ -163,19 +158,22 @@ extension UsersControllerGisilaWeb on UsersController {
             app: app,
             config: __cfg,
             handler: (RequestContext ctx) async {
-              try {
-                final request = ctx.request;
-                final id =
-                    coerce<String>(request.params['id'], 'id', required: true);
-                final users = ctx.service<UserService>();
-                final result = await this.getUser(id, users);
-                return jsonResponse(body: result, statusCode: 200);
-              } on TypeError catch (e) {
-                throw BadRequestException('Invalid request payload ($e)');
-              } on FormatException catch (e) {
-                throw BadRequestException(
-                    'Invalid request format: ${e.message}');
-              }
+              final request = ctx.request;
+              final (id, users) = await (() async {
+                try {
+                  final id = coerce<String>(request.params['id'], 'id',
+                      required: true);
+                  final users = ctx.service<UserService>();
+                  return (id, users);
+                } on TypeError catch (e) {
+                  throw BadRequestException('Invalid request payload ($e)');
+                } on FormatException catch (e) {
+                  throw BadRequestException(
+                      'Invalid request format: ${e.message}');
+                }
+              })();
+              final result = await this.getUser(id, users);
+              return jsonResponse(body: result, statusCode: 200);
             },
           ));
     }
@@ -189,20 +187,23 @@ extension UsersControllerGisilaWeb on UsersController {
             app: app,
             config: __cfg,
             handler: (RequestContext ctx) async {
-              try {
-                final request = ctx.request;
-                final id =
-                    coerce<String>(request.params['id'], 'id', required: true);
-                final form = await bindForm(request, UpdateUserForm.new);
-                final users = ctx.service<UserService>();
-                final result = await this.updateUser(id, form, users);
-                return jsonResponse(body: result, statusCode: 200);
-              } on TypeError catch (e) {
-                throw BadRequestException('Invalid request payload ($e)');
-              } on FormatException catch (e) {
-                throw BadRequestException(
-                    'Invalid request format: ${e.message}');
-              }
+              final request = ctx.request;
+              final (id, form, users) = await (() async {
+                try {
+                  final id = coerce<String>(request.params['id'], 'id',
+                      required: true);
+                  final form = await bindForm(request, UpdateUserForm.new);
+                  final users = ctx.service<UserService>();
+                  return (id, form, users);
+                } on TypeError catch (e) {
+                  throw BadRequestException('Invalid request payload ($e)');
+                } on FormatException catch (e) {
+                  throw BadRequestException(
+                      'Invalid request format: ${e.message}');
+                }
+              })();
+              final result = await this.updateUser(id, form, users);
+              return jsonResponse(body: result, statusCode: 200);
             },
           ));
     }
@@ -217,19 +218,22 @@ extension UsersControllerGisilaWeb on UsersController {
             app: app,
             config: __cfg,
             handler: (RequestContext ctx) async {
-              try {
-                final request = ctx.request;
-                final id =
-                    coerce<String>(request.params['id'], 'id', required: true);
-                final users = ctx.service<UserService>();
-                await this.deleteUser(id, users);
-                return emptyResponse(statusCode: 204);
-              } on TypeError catch (e) {
-                throw BadRequestException('Invalid request payload ($e)');
-              } on FormatException catch (e) {
-                throw BadRequestException(
-                    'Invalid request format: ${e.message}');
-              }
+              final request = ctx.request;
+              final (id, users) = await (() async {
+                try {
+                  final id = coerce<String>(request.params['id'], 'id',
+                      required: true);
+                  final users = ctx.service<UserService>();
+                  return (id, users);
+                } on TypeError catch (e) {
+                  throw BadRequestException('Invalid request payload ($e)');
+                } on FormatException catch (e) {
+                  throw BadRequestException(
+                      'Invalid request format: ${e.message}');
+                }
+              })();
+              await this.deleteUser(id, users);
+              return emptyResponse(statusCode: 204);
             },
           ));
     }

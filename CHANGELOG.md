@@ -22,6 +22,18 @@
   request (it used to let the call through).
 * Incoming `X-Request-Id` values are only reused when they are 1–128
   characters of `[A-Za-z0-9._:-]`.
+* **CORS (breaking for one config).** `CorsConfig(allowCredentials: true)`
+  with the default `'*'` origins now throws `ArgumentError` when the
+  middleware is built, instead of echoing every origin with credentials;
+  list the allowed origins. Only real pre-flights (`OPTIONS` with `Origin`
+  and `Access-Control-Request-Method`) are answered by the middleware; one
+  from a disallowed origin gets `403`, and other `OPTIONS` requests reach
+  the router. Non-wildcard configs send `Vary: Origin` on every response.
+* **Authenticator errors stay on the server.** An exception thrown by the
+  `Authenticator` used to be sent to the client as the 401 message (JWT or
+  database details). It is now a plain `401 Authentication required`, logged
+  at warning level; an `HttpException` 401/403 the authenticator throws on
+  purpose is still sent as is.
 
 ### Fixed
 
@@ -39,6 +51,17 @@
   `TimeoutException` thrown by the handler itself is no longer reported as
   `504`.
 * CORS responses that echo a specific origin send `Vary: Origin`.
+* `@Public` survives later config layers: a method `config:`, named
+  middleware or an app-wide `defaultRouteConfig` with `requireAuth` no longer
+  turns a public route back into a login-required one. A later layer that
+  adds a guard itself still wins.
+* Generated handlers only wrap parameter binding in the `TypeError` /
+  `FormatException` → `400` catch. An error thrown by the controller method
+  itself used to come back as a `400` echoing its text; it now reaches the
+  error handler as a `500`. Regenerate with `build_runner`.
+* An empty query value (`?page=`) counts as not given for non-string
+  parameters, so an optional `int? page` is `null` instead of a `400`.
+  Strings keep `''`.
 
 ## 0.2.0 — MVC overhaul (BREAKING)
 

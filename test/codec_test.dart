@@ -17,6 +17,18 @@ void main() {
       expect(coerce<String?>(null, 'x', required: false), isNull);
     });
 
+    test('an empty value counts as missing, except for strings (FW-12)', () {
+      expect(coerce<int?>('', 'page', required: false), isNull);
+      expect(coerce<bool?>('', 'x', required: false), isNull);
+      expect(coerce<DateTime?>('', 'x', required: false), isNull);
+      expect(coerce<String?>('', 'q', required: false), '');
+      expect(
+        () => coerce<int>('', 'page', required: true),
+        throwsA(isA<BadRequestException>()
+            .having((e) => e.message, 'message', contains('Missing required'))),
+      );
+    });
+
     test('throws BadRequestException for missing required', () {
       expect(
         () => coerce<int>(null, 'x', required: true),

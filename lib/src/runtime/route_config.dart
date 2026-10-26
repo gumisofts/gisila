@@ -96,10 +96,16 @@ class RouteConfig {
   /// / [roles]) are unioned; lists ([middleware]) are concatenated.
   ///
   /// When [other.isPublic] is `true`, the merged config inherits the
-  /// public flag and clears all auth/permission guards.
+  /// public flag and clears all auth/permission guards. A public config
+  /// stays public through later layers (a method `config:`, named
+  /// middleware, the app default) unless one of them adds a guard itself.
   RouteConfig merge(RouteConfig? other) {
     if (other == null) return this;
-    if (other.isPublic) {
+    final addsGuards = other.requireAuth ||
+        other.permissions.isNotEmpty ||
+        other.anyPermission.isNotEmpty ||
+        other.roles.isNotEmpty;
+    if (other.isPublic || (isPublic && !addsGuards)) {
       return RouteConfig(
         rateLimit: other.rateLimit ?? rateLimit,
         timeout: other.timeout ?? timeout,

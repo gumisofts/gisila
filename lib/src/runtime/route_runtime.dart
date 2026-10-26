@@ -33,6 +33,7 @@ import 'dart:convert';
 import 'package:shelf/shelf.dart';
 
 import 'app.dart';
+import 'auth_failure.dart';
 import 'context.dart';
 import 'exceptions.dart';
 import 'middleware/body_limit.dart';
@@ -140,15 +141,10 @@ Middleware _authzMiddleware(GisilaApp app, RouteConfig cfg) {
       final ctx = RequestContext.maybeOf(request) ??
           RequestContext(requestId: 'unbound', request: request);
 
-      Object? authError;
       try {
         ctx.principal = await app.config.authenticator.authenticate(request);
-      } catch (e) {
-        authError = e;
-      }
-
-      if (authError != null) {
-        return _errResp(Unauthorized(authError.toString()));
+      } catch (e, st) {
+        return _errResp(authFailure(app, e, st, requestId: ctx.requestId));
       }
       if (ctx.principal == null) {
         return _errResp(Unauthorized());

@@ -295,8 +295,10 @@ void main() {
     });
 
     test('pre-flight does not take a session', () async {
-      final res = await h(_req('OPTIONS', '/d',
-          peer: '1.1.1.1', headers: {'origin': 'https://app'}));
+      final res = await h(_req('OPTIONS', '/d', peer: '1.1.1.1', headers: {
+        'origin': 'https://app',
+        'access-control-request-method': 'GET',
+      }));
       expect(res.statusCode, 204);
       expect(db.opened, 0);
     });

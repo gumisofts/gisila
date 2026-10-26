@@ -24,6 +24,7 @@ import 'package:shelf/shelf.dart';
 import 'app.dart';
 import 'auth/authenticator.dart';
 import 'auth/permission_resolver.dart';
+import 'auth_failure.dart';
 import 'context.dart';
 import 'exceptions.dart';
 
@@ -69,8 +70,8 @@ Future<GuardResult> guardRequest(
 
     try {
       ctx.principal = await auth.authenticate(request);
-    } catch (e) {
-      return _errorResponse(Unauthorized(e.toString()));
+    } catch (e, st) {
+      return _errorResponse(authFailure(app, e, st, requestId: ctx.requestId));
     }
     if (ctx.principal == null) {
       return _errorResponse(Unauthorized());
