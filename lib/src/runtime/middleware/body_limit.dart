@@ -35,24 +35,17 @@ Middleware bodySizeLimitMiddleware(int maxBytes) {
 
 /// Passes [source] through, failing with [PayloadTooLarge] once more
 /// than [maxBytes] have been seen.
-Stream<List<int>> limitBytes(Stream<List<int>> source, int maxBytes) {
+///
+/// Iterates rather than using `Stream.transform`: a `dart:io` body is a
+/// `Stream<Uint8List>` at runtime, and a `List<int>` transformer fails the
+/// covariant type check on every request.
+Stream<List<int>> limitBytes(Stream<List<int>> source, int maxBytes) async* {
   var seen = 0;
-  var failed = false;
-  return source.transform(StreamTransformer.fromHandlers(
-    handleData: (chunk, sink) {
-      if (failed) return;
-      seen += chunk.length;
-      if (seen > maxBytes) {
-        failed = true;
-        sink.addError(
-            PayloadTooLarge('Request body exceeds limit of $maxBytes bytes'));
-        sink.close();
-        return;
-      }
-      sink.add(chunk);
-    },
-    handleDone: (sink) {
-      if (!failed) sink.close();
-    },
-  ));
+  await for (final chunk in source) {
+    seen += chunk.length;
+    if (seen > maxBytes) {
+      throw PayloadTooLarge('Request body exceeds limit of $maxBytes bytes');
+    }
+    yield chunk;
+  }
 }

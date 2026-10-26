@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show HttpConnectionInfo, InternetAddress;
+import 'dart:typed_data';
 
 import 'package:gisila/gisila.dart';
 import 'package:test/test.dart';
@@ -195,6 +196,26 @@ void main() {
       expect(res.statusCode, 413);
       final err = (jsonDecode(await res.readAsString()) as Map)['error'] as Map;
       expect(err['code'], 'payload_too_large');
+    });
+
+    // dart:io hands shelf a Stream<Uint8List>; a List<int> transformer
+    // used to fail its runtime type check on every request.
+    test('a Uint8List body stream (as from dart:io) passes', () async {
+      final h = echo(AppConfig(logRequests: false, maxRequestBodyBytes: 64));
+      final res = await h(_req('POST', '/e',
+          headers: {'content-type': 'application/json'},
+          body: Stream<Uint8List>.fromIterable(
+              [Uint8List.fromList(utf8.encode('{"a":1}'))])));
+      expect(res.statusCode, 200);
+      expect(await res.readAsString(), '{"a":1}');
+    });
+
+    test('a Uint8List body stream over the limit is refused', () async {
+      final h = echo(AppConfig(logRequests: false, maxRequestBodyBytes: 16));
+      final res = await h(_req('POST', '/e',
+          headers: {'content-type': 'application/json'},
+          body: Stream<Uint8List>.fromIterable([Uint8List(64)])));
+      expect(res.statusCode, 413);
     });
 
     test('chunked body under the limit passes', () async {
