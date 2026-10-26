@@ -131,11 +131,13 @@ Object? _normaliseForJson(Object? value) {
         entry.key.toString(): _normaliseForJson(entry.value),
     };
   }
-  // Anything else: trust toJson() if it exists; fall back to toString().
+  // Anything else: trust toJson() if it exists; an enum without one is
+  // its name ("red", not "Color.red"); otherwise fall back to toString().
   try {
     final dynamic dyn = value;
     return _normaliseForJson(dyn.toJson() as Object?);
   } on NoSuchMethodError {
+    if (value is Enum) return value.name;
     return value.toString();
   }
 }

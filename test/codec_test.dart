@@ -65,7 +65,21 @@ void main() {
       final res = jsonResponse(body: _Demo('alice'));
       expect(await res.readAsString(), '{"name":"alice"}');
     });
+
+    test('an enum is sent as its name unless it has toJson()', () async {
+      final res =
+          jsonResponse(body: <String, Object?>{'c': _Color.red, 'k': _Coded.a});
+      expect(await res.readAsString(), '{"c":"red","k":"A"}');
+    });
   });
+}
+
+enum _Color { red }
+
+enum _Coded {
+  a;
+
+  String toJson() => 'A';
 }
 
 class _Demo {
