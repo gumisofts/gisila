@@ -47,7 +47,8 @@ class RateLimitConfig {
 /// right to left and the first address that is not itself a trusted
 /// proxy wins. Returns `null` when the request did not come from a
 /// socket (e.g. in-memory tests) and carries no usable header.
-String? clientAddress(Request request, {Set<String> trustedProxies = const {}}) {
+String? clientAddress(Request request,
+    {Set<String> trustedProxies = const {}}) {
   final info = request.context['shelf.io.connection_info'];
   final peer = info is HttpConnectionInfo ? info.remoteAddress.address : null;
   if (trustedProxies.isEmpty) return peer;
@@ -57,11 +58,8 @@ String? clientAddress(Request request, {Set<String> trustedProxies = const {}}) 
 
   final fwd = request.headers['x-forwarded-for'];
   if (fwd == null || fwd.isEmpty) return peer;
-  final hops = fwd
-      .split(',')
-      .map((h) => h.trim())
-      .where((h) => h.isNotEmpty)
-      .toList();
+  final hops =
+      fwd.split(',').map((h) => h.trim()).where((h) => h.isNotEmpty).toList();
   for (final hop in hops.reversed) {
     if (!matcher.matches(hop)) return hop;
   }
@@ -105,8 +103,8 @@ Middleware rateLimitMiddleware([
       }
 
       final key = keyOf(request);
-      final bucket = buckets.remove(key) ??
-          _Bucket(tokens: maxTokens, lastRefill: now);
+      final bucket =
+          buckets.remove(key) ?? _Bucket(tokens: maxTokens, lastRefill: now);
       buckets[key] = bucket;
       final elapsed = now.difference(bucket.lastRefill).inMilliseconds / 1000.0;
       bucket.tokens =

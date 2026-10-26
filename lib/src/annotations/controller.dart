@@ -85,90 +85,75 @@ class Route {
 class Get extends Route {
   const Get(
     String path, {
-    int statusCode = 200,
-    String contentType = 'application/json',
-    RouteConfig? config,
+    super.statusCode,
+    super.contentType,
+    super.config,
   }) : super(
           'GET',
           path,
-          statusCode: statusCode,
-          contentType: contentType,
-          config: config,
         );
 }
 
 class Post extends Route {
   const Post(
     String path, {
-    int statusCode = 201,
-    String contentType = 'application/json',
-    RouteConfig? config,
+    super.statusCode = 201,
+    super.contentType,
+    super.config,
   }) : super(
           'POST',
           path,
-          statusCode: statusCode,
-          contentType: contentType,
-          config: config,
         );
 }
 
 class Put extends Route {
   const Put(
     String path, {
-    int statusCode = 200,
-    String contentType = 'application/json',
-    RouteConfig? config,
+    super.statusCode,
+    super.contentType,
+    super.config,
   }) : super(
           'PUT',
           path,
-          statusCode: statusCode,
-          contentType: contentType,
-          config: config,
         );
 }
 
 class Patch extends Route {
   const Patch(
     String path, {
-    int statusCode = 200,
-    String contentType = 'application/json',
-    RouteConfig? config,
+    super.statusCode,
+    super.contentType,
+    super.config,
   }) : super(
           'PATCH',
           path,
-          statusCode: statusCode,
-          contentType: contentType,
-          config: config,
         );
 }
 
 class Delete extends Route {
   const Delete(
     String path, {
-    int statusCode = 204,
-    String contentType = 'application/json',
-    RouteConfig? config,
+    super.statusCode = 204,
+    super.contentType,
+    super.config,
   }) : super(
           'DELETE',
           path,
-          statusCode: statusCode,
-          contentType: contentType,
-          config: config,
         );
 }
 
 class Head extends Route {
   const Head(
     String path, {
-    int statusCode = 200,
-    RouteConfig? config,
-  }) : super('HEAD', path, statusCode: statusCode, config: config);
+    super.statusCode,
+    super.config,
+  }) : super('HEAD', path);
 }
 
 class Options extends Route {
   const Options(
     String path, {
-    int statusCode = 204,
-    RouteConfig? config,
-  }) : super('OPTIONS', path, statusCode: statusCode, config: config);
+    super.statusCode = 204,
+    super.config,
+  }) : super('OPTIONS', path);
 }

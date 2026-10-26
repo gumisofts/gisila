@@ -30,9 +30,8 @@ Middleware requestIdMiddleware({
     return (Request request) async {
       final incoming = request.headers[lcHeader];
       // Only reuse ids that are safe to echo and log.
-      final id = (incoming != null && _safeId.hasMatch(incoming))
-          ? incoming
-          : gen();
+      final id =
+          (incoming != null && _safeId.hasMatch(incoming)) ? incoming : gen();
 
       var ctx = RequestContext.maybeOf(request);
       ctx ??= RequestContext(requestId: id, request: request);

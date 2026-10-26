@@ -20,8 +20,8 @@ Middleware bodySizeLimitMiddleware(int maxBytes) {
     return (Request request) async {
       final contentLength = request.contentLength;
       if (contentLength != null && contentLength > maxBytes) {
-        final e = PayloadTooLarge(
-            'Request body exceeds limit of $maxBytes bytes');
+        final e =
+            PayloadTooLarge('Request body exceeds limit of $maxBytes bytes');
         return Response(
           e.statusCode,
           body: jsonEncode(e.toJson()),

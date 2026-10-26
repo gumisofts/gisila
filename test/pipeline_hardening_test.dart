@@ -92,14 +92,13 @@ void main() {
         requestsPerMinute: 1,
         trustedProxies: {'10.0.0.0/8'},
       ));
-      Request viaProxy(String xff) => _req('GET', '/',
-          peer: '10.1.2.3', headers: {'x-forwarded-for': xff});
+      Request viaProxy(String xff) =>
+          _req('GET', '/', peer: '10.1.2.3', headers: {'x-forwarded-for': xff});
       // Left-most entries are client-controlled; the right-most
       // untrusted hop is the one the proxy saw.
       expect((await h(viaProxy('6.6.6.6, 1.1.1.1'))).statusCode, 200);
       expect((await h(viaProxy('7.7.7.7, 1.1.1.1'))).statusCode, 429);
-      expect((await h(viaProxy('1.1.1.1, 2.2.2.2, 10.0.0.9'))).statusCode,
-          200);
+      expect((await h(viaProxy('1.1.1.1, 2.2.2.2, 10.0.0.9'))).statusCode, 200);
     });
 
     test('clientAddress ignores the header from untrusted peers', () {
@@ -133,8 +132,8 @@ void main() {
     });
 
     test('bucket map is bounded', () async {
-      final h = limited(
-          const RateLimitConfig(requestsPerMinute: 1, maxBuckets: 2));
+      final h =
+          limited(const RateLimitConfig(requestsPerMinute: 1, maxBuckets: 2));
       await h(_req('GET', '/', peer: '1.1.1.1'));
       await h(_req('GET', '/', peer: '2.2.2.2'));
       await h(_req('GET', '/', peer: '3.3.3.3'));
@@ -170,10 +169,11 @@ void main() {
     test('unsafe incoming request ids are replaced', () async {
       final h = _app(AppConfig(logRequests: false),
           (app, r) => r.get('/', (Request _) => Response.ok('ok')));
-      final good = await h(_req('GET', '/', headers: {'x-request-id': 'abc-1'}));
+      final good =
+          await h(_req('GET', '/', headers: {'x-request-id': 'abc-1'}));
       expect(good.headers['x-request-id'], 'abc-1');
-      final bad = await h(
-          _req('GET', '/', headers: {'x-request-id': 'a b"<script>'}));
+      final bad =
+          await h(_req('GET', '/', headers: {'x-request-id': 'a b"<script>'}));
       expect(bad.headers['x-request-id'], isNot(contains(' ')));
     });
   });
@@ -191,8 +191,11 @@ void main() {
       final h = echo(AppConfig(logRequests: false, maxRequestBodyBytes: 16));
       final res = await h(_req('POST', '/e',
           headers: {'content-type': 'application/json'},
-          body: Stream<List<int>>.fromIterable(
-              [utf8.encode('{"a":"'), List.filled(64, 0x61), utf8.encode('"}')])));
+          body: Stream<List<int>>.fromIterable([
+            utf8.encode('{"a":"'),
+            List.filled(64, 0x61),
+            utf8.encode('"}')
+          ])));
       expect(res.statusCode, 413);
       final err = (jsonDecode(await res.readAsString()) as Map)['error'] as Map;
       expect(err['code'], 'payload_too_large');
@@ -252,7 +255,8 @@ void main() {
       return sb.toString();
     }
 
-    Future<FormData> parse(String body, {int maxParts = 1000, int maxField = 1024}) =>
+    Future<FormData> parse(String body,
+            {int maxParts = 1000, int maxField = 1024}) =>
         parseFormData(
           headers: {'content-type': 'multipart/form-data; boundary=bnd'},
           body: () async => body,
@@ -359,8 +363,8 @@ void main() {
           logRequests: false,
           requestTimeout: const Duration(seconds: 5),
         ),
-        (app, r) => r.get(
-            '/t', (Request _) => throw TimeoutException('upstream slow')),
+        (app, r) =>
+            r.get('/t', (Request _) => throw TimeoutException('upstream slow')),
       );
       final res = await h(_req('GET', '/t'));
       expect(res.statusCode, 500);
