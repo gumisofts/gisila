@@ -36,6 +36,7 @@ class AppConfig {
     this.requestIdHeader = 'X-Request-Id',
     this.cors,
     this.rateLimit,
+    this.trustedProxies = const <String>{'127.0.0.1', '::1'},
     this.defaultRouteConfig = RouteConfig.empty,
     this.errorHandler,
     this.serverHeader = 'gisila/0.2.0',
@@ -111,6 +112,17 @@ class AppConfig {
   /// If non-null, the rate-limit middleware is registered with this
   /// config.
   final RateLimitConfig? rateLimit;
+
+  /// Reverse proxies (exact IPs or CIDR ranges) allowed to report the
+  /// client address via `X-Forwarded-For`. Used by the rate limiter's
+  /// default key (see [clientAddress]); empty means the header is
+  /// always ignored.
+  ///
+  /// Defaults to loopback, which covers a reverse proxy (nginx, Caddy)
+  /// on the same host: only local processes can connect from there.
+  /// Add your load balancer's range when it lives elsewhere, e.g.
+  /// `{'127.0.0.1', '::1', '10.0.0.0/8'}`.
+  final Set<String> trustedProxies;
 
   /// Baseline per-route configuration applied to every generated
   /// route, before merging class-level and method-level overrides.

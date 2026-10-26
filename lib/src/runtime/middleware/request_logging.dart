@@ -1,11 +1,13 @@
 /// Per-request structured logging middleware.
 library gisila.runtime.middleware.request_logging;
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:shelf/shelf.dart';
 
 import '../context.dart';
+import '../exceptions.dart' show PayloadTooLarge;
 import '../logging/log_event.dart';
 import '../logging/logger.dart';
 
@@ -30,7 +32,15 @@ Middleware requestLoggingMiddleware({
       String? requestBody;
       var req = request;
       if (logRequestBody) {
-        requestBody = await req.readAsString();
+        try {
+          requestBody = await req.readAsString();
+        } on PayloadTooLarge catch (e) {
+          return Response(
+            e.statusCode,
+            body: jsonEncode(e.toJson()),
+            headers: const {'content-type': 'application/json; charset=utf-8'},
+          );
+        }
         req = req.change(body: requestBody);
       }
 

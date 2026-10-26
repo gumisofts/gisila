@@ -33,11 +33,14 @@ import 'dart:convert';
 import 'package:shelf/shelf.dart';
 
 import 'app.dart';
+import 'auth_failure.dart';
 import 'context.dart';
 import 'exceptions.dart';
+import 'middleware/body_limit.dart';
 import 'middleware/content_type.dart';
 import 'middleware/cors.dart';
 import 'middleware/rate_limit.dart';
+import 'middleware/timeout.dart';
 import 'route_config.dart';
 
 /// Signature for the typed handler the generator emits.
@@ -83,12 +86,12 @@ Handler gisilaRoute({
 
   // 7. AuthN/AuthZ (innermost, runs right before handler)
   if (effective.hasAuthGuards) {
-    current = _authzMiddleware(effective)(current);
+    current = _authzMiddleware(app, effective)(current);
   }
 
   // 6. Per-route timeout
   if (effective.timeout != null) {
-    current = _routeTimeoutMiddleware(effective.timeout!)(current);
+    current = timeoutMiddleware(effective.timeout!)(current);
   }
 
   // 5. User-supplied middleware (outermost user middleware runs first)
@@ -98,7 +101,7 @@ Handler gisilaRoute({
 
   // 4. Per-route body size cap
   if (effective.maxBodyBytes != null) {
-    current = _routeBodySizeLimit(effective.maxBodyBytes!)(current);
+    current = bodySizeLimitMiddleware(effective.maxBodyBytes!)(current);
   }
 
   // 3. Per-route content-type whitelist
@@ -110,7 +113,10 @@ Handler gisilaRoute({
 
   // 2. Per-route rate limit
   if (effective.rateLimit != null) {
-    current = rateLimitMiddleware(effective.rateLimit!)(current);
+    current = rateLimitMiddleware(
+      effective.rateLimit!,
+      app.config.trustedProxies,
+    )(current);
   }
 
   // 1. Per-route CORS overrides
@@ -126,24 +132,19 @@ Handler gisilaRoute({
 // generated route definition stays self-contained.
 // ---------------------------------------------------------------------------
 
-Middleware _authzMiddleware(RouteConfig cfg) {
+/// Uses the [app] the route was built with rather than the one on the
+/// request context, so the guards hold even when the router is
+/// mounted outside `GisilaApp.buildHandler()`.
+Middleware _authzMiddleware(GisilaApp app, RouteConfig cfg) {
   return (Handler inner) {
     return (Request request) async {
-      final app = GisilaApp.maybeOf(request);
-      if (app == null) return inner(request);
-
       final ctx = RequestContext.maybeOf(request) ??
           RequestContext(requestId: 'unbound', request: request);
 
-      Object? authError;
       try {
         ctx.principal = await app.config.authenticator.authenticate(request);
-      } catch (e) {
-        authError = e;
-      }
-
-      if (authError != null) {
-        return _errResp(Unauthorized(authError.toString()));
+      } catch (e, st) {
+        return _errResp(authFailure(app, e, st, requestId: ctx.requestId));
       }
       if (ctx.principal == null) {
         return _errResp(Unauthorized());
@@ -191,50 +192,6 @@ Middleware _authzMiddleware(RouteConfig cfg) {
         kContextKey: ctx,
       });
       return inner(req);
-    };
-  };
-}
-
-Middleware _routeTimeoutMiddleware(Duration timeout) {
-  return (Handler inner) {
-    return (Request request) async {
-      try {
-        return await Future.sync(() => inner(request)).timeout(timeout);
-      } on TimeoutException {
-        return Response(
-          504,
-          body: jsonEncode(<String, Object?>{
-            'error': <String, Object?>{
-              'status': 504,
-              'code': 'gateway_timeout',
-              'message': 'Request exceeded ${timeout.inMilliseconds}ms timeout',
-            },
-          }),
-          headers: const {'content-type': 'application/json; charset=utf-8'},
-        );
-      }
-    };
-  };
-}
-
-Middleware _routeBodySizeLimit(int maxBytes) {
-  return (Handler inner) {
-    return (Request request) async {
-      final contentLength = request.contentLength;
-      if (contentLength != null && contentLength > maxBytes) {
-        return Response(
-          413,
-          body: jsonEncode(<String, Object?>{
-            'error': <String, Object?>{
-              'status': 413,
-              'code': 'payload_too_large',
-              'message': 'Request body exceeds limit of $maxBytes bytes',
-            },
-          }),
-          headers: const {'content-type': 'application/json; charset=utf-8'},
-        );
-      }
-      return inner(request);
     };
   };
 }

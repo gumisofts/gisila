@@ -12,6 +12,8 @@
 /// ```
 library gisila.runtime.context;
 
+import 'dart:async';
+
 import 'package:shelf/shelf.dart';
 
 import 'auth/principal.dart';
@@ -96,6 +98,33 @@ class RequestContext {
   /// the configured provider is not a subtype of [T].
   T cacheAs<T extends CacheProvider>() => cache as T;
 
+  /// Cancelled when the framework gives up on this request (it timed
+  /// out). Long-running handlers should check
+  /// [CancellationToken.isCancelled] or call
+  /// [CancellationToken.throwIfCancelled] between steps: once
+  /// cancelled, the client already has its `504` and any database
+  /// work is rolled back.
+  CancellationToken get cancellation =>
+      extra.putIfAbsent(kCancellationKey, CancellationToken.new)
+          as CancellationToken;
+
+  /// Records handler work still running after the framework answered
+  /// the request (a timeout). Resource owners such as the database
+  /// session middleware wait for it before releasing what the handler
+  /// may still be using.
+  void addAbandonedWork(Future<Object?> work) {
+    final list = extra.putIfAbsent(kAbandonedWorkKey, () => <Future<void>>[])
+        as List<Future<void>>;
+    // Errors from abandoned work have nowhere to go; swallow them so
+    // they don't surface as unhandled.
+    list.add(work.then((_) {}, onError: (Object _) {}));
+  }
+
+  /// Work registered via [addAbandonedWork].
+  List<Future<void>> get abandonedWork =>
+      (extra[kAbandonedWorkKey] as List<Future<void>>?) ??
+      const <Future<void>>[];
+
   /// Returns an instance of service [T] for this request.
   ///
   /// The lookup is delegated to a resolver installed by [GisilaApp]
@@ -125,3 +154,35 @@ class RequestContext {
 /// `RequestContext.extra` key under which [GisilaApp] stashes the
 /// service resolver function.
 const String kServiceResolverKey = 'gisila.service_resolver';
+
+/// `RequestContext.extra` key holding the request's [CancellationToken].
+const String kCancellationKey = 'gisila.cancellation';
+
+/// `RequestContext.extra` key holding abandoned handler work.
+const String kAbandonedWorkKey = 'gisila.abandoned_work';
+
+/// Thrown by [CancellationToken.throwIfCancelled].
+class RequestCancelledException implements Exception {
+  const RequestCancelledException();
+
+  @override
+  String toString() => 'RequestCancelledException: request was cancelled';
+}
+
+/// Cooperative cancellation signal for one request.
+class CancellationToken {
+  final Completer<void> _completer = Completer<void>();
+
+  bool get isCancelled => _completer.isCompleted;
+
+  /// Completes when the request is cancelled.
+  Future<void> get whenCancelled => _completer.future;
+
+  void cancel() {
+    if (!_completer.isCompleted) _completer.complete();
+  }
+
+  void throwIfCancelled() {
+    if (isCancelled) throw const RequestCancelledException();
+  }
+}

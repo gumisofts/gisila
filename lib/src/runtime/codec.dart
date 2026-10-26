@@ -74,14 +74,17 @@ Future<Object?> readJsonBody(Request request, {bool required = true}) async {
 /// required parameters or invalid formats.
 T coerce<T>(String? value, String paramName, {required bool required}) {
   final isNullable = null is T;
-  if (value == null) {
+  // `?page=` means "not given" for anything but a string; an empty value
+  // can't be parsed as a number, bool or date anyway.
+  final isString = T == String || T == _typeOf<String?>();
+  if (value == null || (value.isEmpty && !isString)) {
     if (required && !isNullable) {
       throw BadRequestException('Missing required parameter: $paramName');
     }
     return null as T;
   }
   try {
-    if (T == String || T == _typeOf<String?>()) return value as T;
+    if (isString) return value as T;
     if (T == int || T == _typeOf<int?>()) return int.parse(value) as T;
     if (T == double || T == _typeOf<double?>()) return double.parse(value) as T;
     if (T == num || T == _typeOf<num?>()) return num.parse(value) as T;
@@ -128,11 +131,13 @@ Object? _normaliseForJson(Object? value) {
         entry.key.toString(): _normaliseForJson(entry.value),
     };
   }
-  // Anything else: trust toJson() if it exists; fall back to toString().
+  // Anything else: trust toJson() if it exists; an enum without one is
+  // its name ("red", not "Color.red"); otherwise fall back to toString().
   try {
     final dynamic dyn = value;
     return _normaliseForJson(dyn.toJson() as Object?);
   } on NoSuchMethodError {
+    if (value is Enum) return value.name;
     return value.toString();
   }
 }

@@ -1,5 +1,70 @@
 # Changelog
 
+## Unreleased — pipeline hardening
+
+### Security
+
+* **Rate limiter keys on the real client.** The default key is now the
+  socket's peer address (it used to be the same string for every client).
+  `X-Forwarded-For` is only trusted from `AppConfig.trustedProxies` /
+  `RateLimitConfig.trustedProxies` (exact IPs or CIDR), which defaults to
+  loopback so apps behind a local nginx/Caddy keep working. Idle buckets are
+  swept and the map is capped by `RateLimitConfig.maxBuckets`. `Retry-After`
+  is now the real wait. New helper: `clientAddress(request, trustedProxies:)`.
+* **Body size limits hold for chunked bodies.** `maxRequestBodyBytes` /
+  `RouteConfig.maxBodyBytes` now meter the body stream and fail with `413`
+  (`PayloadTooLarge`) as soon as the cap is crossed. Multipart parsing caps
+  parts (`maxParts`, default 1000) and text field size (`maxFieldBytes`,
+  default 1 MiB).
+* **Route guards fail closed.** `gisilaRoute` uses the app it was built with,
+  so guards hold even when the router is mounted outside `buildHandler()`.
+  `guardRequest` returns `500` for a guarded route with no `GisilaApp` on the
+  request (it used to let the call through).
+* Incoming `X-Request-Id` values are only reused when they are 1–128
+  characters of `[A-Za-z0-9._:-]`.
+* **CORS (breaking for one config).** `CorsConfig(allowCredentials: true)`
+  with the default `'*'` origins now throws `ArgumentError` when the
+  middleware is built, instead of echoing every origin with credentials;
+  list the allowed origins. Only real pre-flights (`OPTIONS` with `Origin`
+  and `Access-Control-Request-Method`) are answered by the middleware; one
+  from a disallowed origin gets `403`, and other `OPTIONS` requests reach
+  the router. Non-wildcard configs send `Vary: Origin` on every response.
+* **Authenticator errors stay on the server.** An exception thrown by the
+  `Authenticator` used to be sent to the client as the 401 message (JWT or
+  database details). It is now a plain `401 Authentication required`, logged
+  at warning level; an `HttpException` 401/403 the authenticator throws on
+  purpose is still sent as is.
+
+### Fixed
+
+* Multi-value response headers (several `Set-Cookie`) are no longer joined
+  into one by the CORS, request-id and server-header middleware.
+* The DB session middleware now runs inside CORS, rate limiting, the body cap
+  and the error mapper: pre-flights and rejected requests don't take a pooled
+  connection, and a failing `DatabaseProvider.open` is a normal JSON `500`.
+  A thrown `HttpException` below 500 or a form validation error still closes
+  the session with `ok: true`.
+* Timeouts: a timed-out handler keeps running (Dart can't abort it), so the
+  session now stays open until it finishes and is then closed with
+  `ok: false`. `RequestContext.cancellation` is cancelled on timeout; check
+  `isCancelled` or call `throwIfCancelled()` in long handlers. A
+  `TimeoutException` thrown by the handler itself is no longer reported as
+  `504`.
+* CORS responses that echo a specific origin send `Vary: Origin`.
+* `@Public` survives later config layers: a method `config:`, named
+  middleware or an app-wide `defaultRouteConfig` with `requireAuth` no longer
+  turns a public route back into a login-required one. A later layer that
+  adds a guard itself still wins.
+* Generated handlers only wrap parameter binding in the `TypeError` /
+  `FormatException` → `400` catch. An error thrown by the controller method
+  itself used to come back as a `400` echoing its text; it now reaches the
+  error handler as a `500`. Regenerate with `build_runner`.
+* JSON responses send an enum without a `toJson()` as its `name` (`"red"`);
+  they used to send `toString()` (`"Color.red"`).
+* An empty query value (`?page=`) counts as not given for non-string
+  parameters, so an optional `int? page` is `null` instead of a `400`.
+  Strings keep `''`.
+
 ## 0.2.0 — MVC overhaul (BREAKING)
 
 This release reshapes gisila into a proper MVC framework. Every consumer must

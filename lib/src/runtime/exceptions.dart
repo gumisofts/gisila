@@ -35,8 +35,7 @@ class HttpException implements Exception {
 }
 
 class BadRequest extends HttpException {
-  BadRequest(String message, {String? code, Map<String, Object?>? details})
-      : super(400, message, code: code, details: details);
+  BadRequest(String message, {super.code, super.details}) : super(400, message);
 }
 
 class Unauthorized extends HttpException {
@@ -55,8 +54,13 @@ class NotFound extends HttpException {
 }
 
 class Conflict extends HttpException {
-  Conflict(String message, {String? code, Map<String, Object?>? details})
-      : super(409, message, code: code ?? 'conflict', details: details);
+  Conflict(String message, {String? code, super.details})
+      : super(409, message, code: code ?? 'conflict');
+}
+
+class PayloadTooLarge extends HttpException {
+  PayloadTooLarge([String message = 'Request body too large'])
+      : super(413, message, code: 'payload_too_large');
 }
 
 class TooManyRequests extends HttpException {
@@ -89,12 +93,11 @@ class EndpointException extends HttpException {
     required int statusCode,
     Map<String, Object?>? body,
     String? message,
-    String? code,
+    super.code,
   })  : _body = body,
         super(
           statusCode,
           message ?? _bodyDetail(body) ?? 'Endpoint error',
-          code: code,
           details: body,
         );
 

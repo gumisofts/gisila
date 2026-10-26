@@ -1,5 +1,4 @@
 import 'package:gisila/gisila.dart';
-import 'package:shelf/shelf.dart' show Request;
 import 'package:test/test.dart';
 
 void main() {
@@ -35,9 +34,9 @@ void main() {
     });
 
     test('TTL expiry evicts entries', () async {
-      await cache.set('ttl', 'x', ttl: Duration(milliseconds: 50));
+      await cache.set('ttl', 'x', ttl: const Duration(milliseconds: 50));
       expect(await cache.get('ttl'), 'x');
-      await Future<void>.delayed(Duration(milliseconds: 100));
+      await Future<void>.delayed(const Duration(milliseconds: 100));
       expect(await cache.get('ttl'), isNull);
     });
 
@@ -102,11 +101,11 @@ void main() {
 
     test('defaultTtl applied when set called without ttl', () async {
       final ttlCache = InMemoryCacheProvider(
-        defaultTtl: Duration(milliseconds: 50),
+        defaultTtl: const Duration(milliseconds: 50),
       );
       await ttlCache.set('k', 'v');
       expect(await ttlCache.get('k'), 'v');
-      await Future<void>.delayed(Duration(milliseconds: 100));
+      await Future<void>.delayed(const Duration(milliseconds: 100));
       expect(await ttlCache.get('k'), isNull);
     });
   });

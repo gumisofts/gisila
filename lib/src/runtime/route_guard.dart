@@ -24,6 +24,7 @@ import 'package:shelf/shelf.dart';
 import 'app.dart';
 import 'auth/authenticator.dart';
 import 'auth/permission_resolver.dart';
+import 'auth_failure.dart';
 import 'context.dart';
 import 'exceptions.dart';
 
@@ -43,16 +44,6 @@ Future<GuardResult> guardRequest(
   Set<String> anyPermission = const {},
   Set<String> roles = const {},
 }) async {
-  final app = GisilaApp.maybeOf(request);
-  if (app == null) {
-    // The framework wasn't booted via GisilaApp. Without an
-    // authenticator we cannot honour the guards, so allow the call
-    // through but stash a minimal context.
-    final ctx = RequestContext.maybeOf(request) ??
-        RequestContext(requestId: 'unbound', request: request);
-    return ctx;
-  }
-
   final ctx = RequestContext.maybeOf(request) ??
       RequestContext(requestId: 'unbound', request: request);
 
@@ -61,14 +52,26 @@ Future<GuardResult> guardRequest(
       anyPermission.isNotEmpty ||
       roles.isNotEmpty;
 
+  final app = GisilaApp.maybeOf(request);
+  if (app == null) {
+    // The framework wasn't booted via GisilaApp, so there is no
+    // authenticator to honour the guards with. Fail closed.
+    if (needsAuth) {
+      return _errorResponse(InternalServerError(
+        'Route guards need the request to go through GisilaApp.',
+      ));
+    }
+    return ctx;
+  }
+
   if (needsAuth) {
     final Authenticator auth = app.config.authenticator;
     final PermissionResolver resolver = app.config.permissionResolver;
 
     try {
       ctx.principal = await auth.authenticate(request);
-    } catch (e) {
-      return _errorResponse(Unauthorized(e.toString()));
+    } catch (e, st) {
+      return _errorResponse(authFailure(app, e, st, requestId: ctx.requestId));
     }
     if (ctx.principal == null) {
       return _errorResponse(Unauthorized());

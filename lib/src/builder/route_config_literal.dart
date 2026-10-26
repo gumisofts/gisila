@@ -95,9 +95,14 @@ String? _emitRateLimitLiteral(DartObject? obj) {
   final requestsPerMinute =
       obj.getField('requestsPerMinute')?.toIntValue() ?? 120;
   final burstSize = obj.getField('burstSize')?.toIntValue();
+  final trustedProxies = _stringSet(obj.getField('trustedProxies'));
+  final maxBuckets = obj.getField('maxBuckets')?.toIntValue();
   final args = <String>[
     'requestsPerMinute: $requestsPerMinute',
     if (burstSize != null) 'burstSize: $burstSize',
+    if (trustedProxies.isNotEmpty)
+      'trustedProxies: ${stringSetLiteral(trustedProxies)}',
+    if (maxBuckets != null && maxBuckets != 100000) 'maxBuckets: $maxBuckets',
   ];
   return 'const RateLimitConfig(${args.join(', ')})';
 }

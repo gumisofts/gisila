@@ -46,10 +46,17 @@ final multipartFormDataContentType = ContentType(
 /// rather than a `Request` so it can be unit-tested without a Shelf
 /// pipeline, and so [readFormBody] can wrap a Shelf request without
 /// repeating the dispatch logic.
+///
+/// Multipart bodies are capped at [maxParts] parts and
+/// [maxFieldBytes] per text field; going over either throws
+/// [BadRequestException]. The overall body size is capped by
+/// `AppConfig.maxRequestBodyBytes` / `RouteConfig.maxBodyBytes`.
 Future<FormData> parseFormData({
   required Map<String, String> headers,
   required Future<String> Function() body,
   required Stream<List<int>> Function() bytes,
+  int maxParts = defaultMaxFormParts,
+  int maxFieldBytes = defaultMaxFormFieldBytes,
 }) async {
   final contentType = _extractContentType(headers);
   final isFormUrlEncoded = _isFormUrlEncoded(contentType);
@@ -66,8 +73,19 @@ Future<FormData> parseFormData({
 
   return isFormUrlEncoded
       ? _extractFormUrlEncodedFormData(body: await body())
-      : await _extractMultipartFormData(headers: headers, bytes: bytes());
+      : await _extractMultipartFormData(
+          headers: headers,
+          bytes: bytes(),
+          maxParts: maxParts,
+          maxFieldBytes: maxFieldBytes,
+        );
 }
+
+/// Default for [parseFormData]'s `maxParts`.
+const int defaultMaxFormParts = 1000;
+
+/// Default for [parseFormData]'s `maxFieldBytes` (1 MiB).
+const int defaultMaxFormFieldBytes = 1024 * 1024;
 
 ContentType? _extractContentType(Map<String, String> headers) {
   final contentTypeValue = headers[HttpHeaders.contentTypeHeader];
@@ -102,6 +120,8 @@ final _keyValueRegexp = RegExp('(?:(?<key>[a-zA-Z0-9-_]+)="(?<value>.*?)";*)+');
 Future<FormData> _extractMultipartFormData({
   required Map<String, String> headers,
   required Stream<List<int>> bytes,
+  required int maxParts,
+  required int maxFieldBytes,
 }) async {
   final contentType = headers[HttpHeaders.contentTypeHeader]!;
   final mediaType = MediaType.parse(contentType);
@@ -115,7 +135,12 @@ Future<FormData> _extractMultipartFormData({
   final fields = <String, String>{};
   final files = <String, UploadedFile>{};
 
+  var parts = 0;
   await for (final part in transformer.bind(bytes)) {
+    if (++parts > maxParts) {
+      throw BadRequestException(
+          'multipart/form-data has more than $maxParts parts.');
+    }
     final contentDisposition = part.headers['content-disposition'];
     if (contentDisposition == null) continue;
     if (!contentDisposition.startsWith('form-data;')) continue;
@@ -141,9 +166,19 @@ Future<FormData> _extractMultipartFormData({
       }
       files[name] = UploadedFile(fileName, partContentType, part);
     } else {
-      final partBytes =
-          (await part.toList()).fold(<int>[], (p, e) => p..addAll(e));
-      fields[name] = utf8.decode(partBytes);
+      final partBytes = <int>[];
+      await for (final chunk in part) {
+        if (partBytes.length + chunk.length > maxFieldBytes) {
+          throw BadRequestException(
+              'Form field "$name" exceeds $maxFieldBytes bytes.');
+        }
+        partBytes.addAll(chunk);
+      }
+      try {
+        fields[name] = utf8.decode(partBytes);
+      } on FormatException {
+        throw BadRequestException('Form field "$name" is not valid UTF-8.');
+      }
     }
   }
 
