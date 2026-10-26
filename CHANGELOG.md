@@ -1,5 +1,45 @@
 # Changelog
 
+## Unreleased — pipeline hardening
+
+### Security
+
+* **Rate limiter keys on the real client.** The default key is now the
+  socket's peer address (it used to be the same string for every client).
+  `X-Forwarded-For` is only trusted from `AppConfig.trustedProxies` /
+  `RateLimitConfig.trustedProxies` (exact IPs or CIDR), which defaults to
+  loopback so apps behind a local nginx/Caddy keep working. Idle buckets are
+  swept and the map is capped by `RateLimitConfig.maxBuckets`. `Retry-After`
+  is now the real wait. New helper: `clientAddress(request, trustedProxies:)`.
+* **Body size limits hold for chunked bodies.** `maxRequestBodyBytes` /
+  `RouteConfig.maxBodyBytes` now meter the body stream and fail with `413`
+  (`PayloadTooLarge`) as soon as the cap is crossed. Multipart parsing caps
+  parts (`maxParts`, default 1000) and text field size (`maxFieldBytes`,
+  default 1 MiB).
+* **Route guards fail closed.** `gisilaRoute` uses the app it was built with,
+  so guards hold even when the router is mounted outside `buildHandler()`.
+  `guardRequest` returns `500` for a guarded route with no `GisilaApp` on the
+  request (it used to let the call through).
+* Incoming `X-Request-Id` values are only reused when they are 1–128
+  characters of `[A-Za-z0-9._:-]`.
+
+### Fixed
+
+* Multi-value response headers (several `Set-Cookie`) are no longer joined
+  into one by the CORS, request-id and server-header middleware.
+* The DB session middleware now runs inside CORS, rate limiting, the body cap
+  and the error mapper: pre-flights and rejected requests don't take a pooled
+  connection, and a failing `DatabaseProvider.open` is a normal JSON `500`.
+  A thrown `HttpException` below 500 or a form validation error still closes
+  the session with `ok: true`.
+* Timeouts: a timed-out handler keeps running (Dart can't abort it), so the
+  session now stays open until it finishes and is then closed with
+  `ok: false`. `RequestContext.cancellation` is cancelled on timeout; check
+  `isCancelled` or call `throwIfCancelled()` in long handlers. A
+  `TimeoutException` thrown by the handler itself is no longer reported as
+  `504`.
+* CORS responses that echo a specific origin send `Vary: Origin`.
+
 ## 0.2.0 — MVC overhaul (BREAKING)
 
 This release reshapes gisila into a proper MVC framework. Every consumer must

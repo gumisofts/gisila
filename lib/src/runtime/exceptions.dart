@@ -59,6 +59,11 @@ class Conflict extends HttpException {
       : super(409, message, code: code ?? 'conflict', details: details);
 }
 
+class PayloadTooLarge extends HttpException {
+  PayloadTooLarge([String message = 'Request body too large'])
+      : super(413, message, code: 'payload_too_large');
+}
+
 class TooManyRequests extends HttpException {
   TooManyRequests([String message = 'Too many requests'])
       : super(429, message, code: 'too_many_requests');

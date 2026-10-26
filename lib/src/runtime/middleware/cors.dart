@@ -62,6 +62,8 @@ Middleware corsMiddleware([CorsConfig config = const CorsConfig()]) {
           204,
           headers: <String, String>{
             ...corsHeaders,
+            if (corsHeaders['Access-Control-Allow-Origin'] == origin)
+              'Vary': 'Origin',
             'Access-Control-Allow-Methods': config.allowedMethods.join(', '),
             'Access-Control-Allow-Headers': config.allowedHeaders.join(', '),
             'Access-Control-Max-Age': config.maxAge.inSeconds.toString(),
@@ -70,10 +72,18 @@ Middleware corsMiddleware([CorsConfig config = const CorsConfig()]) {
       }
 
       final response = await inner(request);
-      return response.change(headers: <String, String>{
-        ...response.headersAll.map((k, v) => MapEntry(k, v.join(','))),
-        ...corsHeaders,
-      });
+      if (corsHeaders['Access-Control-Allow-Origin'] == origin) {
+        // The answer depends on the Origin, so caches must key on it.
+        final vary = response.headers['vary'];
+        corsHeaders['Vary'] = vary == null || vary.isEmpty
+            ? 'Origin'
+            : vary.toLowerCase().contains('origin')
+                ? vary
+                : '$vary, Origin';
+      }
+      if (corsHeaders.isEmpty) return response;
+      // `change` merges, so multi-value headers (Set-Cookie) survive.
+      return response.change(headers: corsHeaders);
     };
   };
 }

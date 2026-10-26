@@ -16,10 +16,12 @@ import 'db/db_session_middleware.dart';
 import 'exceptions.dart';
 import 'forms/form.dart' show FormValidationException;
 import 'logging/log_event.dart';
+import 'middleware/body_limit.dart';
 import 'middleware/cors.dart';
 import 'middleware/rate_limit.dart';
 import 'middleware/request_id.dart';
 import 'middleware/request_logging.dart';
+import 'middleware/timeout.dart';
 import 'service.dart';
 
 /// Signature each generated controller exposes via the
@@ -157,10 +159,6 @@ class GisilaApp {
       };
     });
 
-    if (config.database != null) {
-      pipeline = pipeline.addMiddleware(dbSessionMiddleware(config.database!));
-    }
-
     if (config.cache != null) {
       pipeline = pipeline.addMiddleware(cacheMiddleware(config.cache!));
     }
@@ -169,11 +167,12 @@ class GisilaApp {
       pipeline = pipeline.addMiddleware(corsMiddleware(config.cors!));
     }
     if (config.rateLimit != null) {
-      pipeline = pipeline.addMiddleware(rateLimitMiddleware(config.rateLimit!));
+      pipeline = pipeline.addMiddleware(
+          rateLimitMiddleware(config.rateLimit!, config.trustedProxies));
     }
     if (config.maxRequestBodyBytes != null) {
       pipeline = pipeline
-          .addMiddleware(_bodySizeLimitMiddleware(config.maxRequestBodyBytes!));
+          .addMiddleware(bodySizeLimitMiddleware(config.maxRequestBodyBytes!));
     }
     if (config.logRequests) {
       pipeline = pipeline.addMiddleware(requestLoggingMiddleware(
@@ -186,6 +185,13 @@ class GisilaApp {
 
     pipeline = pipeline.addMiddleware(_errorMappingMiddleware());
 
+    // Inside CORS, rate limiting, the body cap and the error mapper:
+    // pre-flights and rejected requests never take a connection, and a
+    // failing `provider.open` renders a normal JSON error.
+    if (config.database != null) {
+      pipeline = pipeline.addMiddleware(dbSessionMiddleware(config.database!));
+    }
+
     for (final mw in _userMiddleware) {
       pipeline = pipeline.addMiddleware(mw);
     }
@@ -194,7 +200,7 @@ class GisilaApp {
 
     if (config.requestTimeout != null) {
       pipeline =
-          pipeline.addMiddleware(_timeoutMiddleware(config.requestTimeout!));
+          pipeline.addMiddleware(timeoutMiddleware(config.requestTimeout!));
     }
 
     return pipeline.addHandler(router.call);
@@ -326,9 +332,9 @@ class GisilaApp {
     return (Handler inner) {
       return (Request request) async {
         final response = await inner(request);
-        final headers = <String, String>{
-          ...response.headersAll.map((k, v) => MapEntry(k, v.join(','))),
-        };
+        // Only the new keys: `change` merges them into the existing
+        // headers, keeping multi-value ones such as Set-Cookie intact.
+        final headers = <String, String>{};
         if (config.serverHeader.isNotEmpty) {
           headers['Server'] = config.serverHeader;
         }
@@ -339,51 +345,6 @@ class GisilaApp {
       };
     };
   }
-
-  Middleware _timeoutMiddleware(Duration timeout) {
-    return (Handler inner) {
-      return (Request request) async {
-        try {
-          return await Future.sync(() => inner(request)).timeout(timeout);
-        } on TimeoutException {
-          return Response(
-            504,
-            body: jsonEncode(<String, Object?>{
-              'error': <String, Object?>{
-                'status': 504,
-                'code': 'gateway_timeout',
-                'message':
-                    'Request exceeded ${timeout.inMilliseconds}ms timeout',
-              },
-            }),
-            headers: const {'content-type': 'application/json; charset=utf-8'},
-          );
-        }
-      };
-    };
-  }
-}
-
-Middleware _bodySizeLimitMiddleware(int maxBytes) {
-  return (Handler inner) {
-    return (Request request) async {
-      final contentLength = request.contentLength;
-      if (contentLength != null && contentLength > maxBytes) {
-        return Response(
-          413,
-          body: jsonEncode(<String, Object?>{
-            'error': <String, Object?>{
-              'status': 413,
-              'code': 'payload_too_large',
-              'message': 'Request body exceeds limit of $maxBytes bytes',
-            },
-          }),
-          headers: const {'content-type': 'application/json; charset=utf-8'},
-        );
-      }
-      return inner(request);
-    };
-  };
 }
 
 class _RegisteredController {

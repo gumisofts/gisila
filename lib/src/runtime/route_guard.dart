@@ -43,16 +43,6 @@ Future<GuardResult> guardRequest(
   Set<String> anyPermission = const {},
   Set<String> roles = const {},
 }) async {
-  final app = GisilaApp.maybeOf(request);
-  if (app == null) {
-    // The framework wasn't booted via GisilaApp. Without an
-    // authenticator we cannot honour the guards, so allow the call
-    // through but stash a minimal context.
-    final ctx = RequestContext.maybeOf(request) ??
-        RequestContext(requestId: 'unbound', request: request);
-    return ctx;
-  }
-
   final ctx = RequestContext.maybeOf(request) ??
       RequestContext(requestId: 'unbound', request: request);
 
@@ -60,6 +50,18 @@ Future<GuardResult> guardRequest(
       permissions.isNotEmpty ||
       anyPermission.isNotEmpty ||
       roles.isNotEmpty;
+
+  final app = GisilaApp.maybeOf(request);
+  if (app == null) {
+    // The framework wasn't booted via GisilaApp, so there is no
+    // authenticator to honour the guards with. Fail closed.
+    if (needsAuth) {
+      return _errorResponse(InternalServerError(
+        'Route guards need the request to go through GisilaApp.',
+      ));
+    }
+    return ctx;
+  }
 
   if (needsAuth) {
     final Authenticator auth = app.config.authenticator;
