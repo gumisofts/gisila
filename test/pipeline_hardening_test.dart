@@ -149,6 +149,7 @@ void main() {
         AppConfig(
           logRequests: false,
           cors: const CorsConfig(allowedOrigins: {'https://app'}),
+          serverHeader: 'test',
         ),
         (app, r) => r.get(
           '/c',

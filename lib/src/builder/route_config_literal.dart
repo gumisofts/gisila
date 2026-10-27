@@ -6,6 +6,7 @@
 /// appear inside a `const RouteConfig(...)`:
 ///
 /// * [RouteConfig], [RateLimitConfig], [CorsConfig], [Duration]
+/// * function tear-offs (`RateLimitConfig.keyExtractor`)
 /// * primitives (`int`, `bool`, `String`) and `Set<String>`
 /// * `null`
 ///
@@ -15,6 +16,7 @@
 library gisila.builder.route_config_literal;
 
 import 'package:analyzer/dart/constant/value.dart';
+import 'package:analyzer/dart/element/element.dart';
 
 import 'utils.dart' show dartString, stringSetLiteral;
 
@@ -97,14 +99,30 @@ String? _emitRateLimitLiteral(DartObject? obj) {
   final burstSize = obj.getField('burstSize')?.toIntValue();
   final trustedProxies = _stringSet(obj.getField('trustedProxies'));
   final maxBuckets = obj.getField('maxBuckets')?.toIntValue();
+  final keyExtractor =
+      _functionReference(obj.getField('keyExtractor')?.toFunctionValue());
   final args = <String>[
     'requestsPerMinute: $requestsPerMinute',
     if (burstSize != null) 'burstSize: $burstSize',
+    if (keyExtractor != null) 'keyExtractor: $keyExtractor',
     if (trustedProxies.isNotEmpty)
       'trustedProxies: ${stringSetLiteral(trustedProxies)}',
     if (maxBuckets != null && maxBuckets != 100000) 'maxBuckets: $maxBuckets',
   ];
   return 'const RateLimitConfig(${args.join(', ')})';
+}
+
+/// Source for a const function tear-off: a top-level function by name, a
+/// static method as `Class.method`. The generated part shares the
+/// controller library's imports, so the name resolves there; a function
+/// imported under a prefix needs to be re-exported or wrapped without one.
+String? _functionReference(ExecutableElement? fn) {
+  if (fn == null) return null;
+  final owner = fn.enclosingElement3;
+  if (fn is MethodElement && owner is InterfaceElement) {
+    return '${owner.name}.${fn.name}';
+  }
+  return fn.name;
 }
 
 String? _emitCorsConfigLiteral(DartObject? obj) {
@@ -134,9 +152,11 @@ String? _emitCorsConfigLiteral(DartObject? obj) {
 
 String? _emitDurationLiteral(DartObject? obj) {
   if (obj == null || obj.isNull) return null;
-  // `Duration` stores its value in the private `_duration` field
-  // (microseconds since 0). Analyzer surfaces it directly.
-  final us = obj.getField('_duration')?.toIntValue();
+  // The constant's stored field: `inMicroseconds` in current SDKs, the
+  // private `_duration` in older ones. Without either the value would be
+  // dropped silently (as `timeout:` was on Dart 3.13).
+  final us = (obj.getField('inMicroseconds') ?? obj.getField('_duration'))
+      ?.toIntValue();
   if (us != null) {
     return 'const Duration(microseconds: $us)';
   }

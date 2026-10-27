@@ -320,17 +320,28 @@ class ControllerGenerator extends GeneratorForAnnotation<Controller> {
           $returnStmt''';
     }
 
+    final verb = route.method.toLowerCase();
+    // `@Get('/')` under `/users` is `/users/`; serve `/users` too, which is
+    // what clients call (shelf_router matches the slash exactly).
+    final alias = shelfPath.endsWith('/')
+        ? '''
+      if (basePath.length > 1) {
+        router.$verb(basePath.substring(0, basePath.length - 1), __route);
+      }'''
+        : '';
     return '''
     {
       final basePath = '\$prefix$shelfPath';
       final RouteConfig __cfg = $cfgExpr;
-      router.${route.method.toLowerCase()}(basePath, gisilaRoute(
+      final __route = gisilaRoute(
         app: app,
         config: __cfg,
+        routeId: '${route.method.toUpperCase()} \$basePath',
         handler: (RequestContext ctx) async {
           $handlerBody
         },
-      ));
+      );
+      router.$verb(basePath, __route);$alias
     }''';
   }
 
@@ -393,7 +404,7 @@ class ControllerGenerator extends GeneratorForAnnotation<Controller> {
   bool _isRouteSubtype(ClassElement element) {
     ClassElement? c = element;
     while (c != null) {
-      if (c.name == 'Route' && c.library.identifier.contains('gisila')) {
+      if (c.name == 'Route' && isGisilaLibrary(c.library)) {
         return true;
       }
       final superType = c.supertype;
@@ -413,7 +424,7 @@ class ControllerGenerator extends GeneratorForAnnotation<Controller> {
       final element = type?.element;
       if (element is! ClassElement) continue;
       if (element.name != 'UseRouteConfig') continue;
-      if (!element.library.identifier.contains('gisila')) continue;
+      if (!isGisilaLibrary(element.library)) continue;
       final cfg = value.getField('config');
       if (cfg != null && !cfg.isNull) return cfg;
     }
@@ -433,7 +444,7 @@ class ControllerGenerator extends GeneratorForAnnotation<Controller> {
       final type = value.type;
       final element = type?.element;
       if (element is! ClassElement) continue;
-      if (!element.library.identifier.contains('gisila')) continue;
+      if (!isGisilaLibrary(element.library)) continue;
 
       switch (element.name) {
         case 'RequireAuth':
@@ -489,7 +500,7 @@ class ControllerGenerator extends GeneratorForAnnotation<Controller> {
       final element = type?.element;
       if (element is! ClassElement) continue;
       if (element.name != 'UseMiddleware') continue;
-      if (!element.library.identifier.contains('gisila')) continue;
+      if (!isGisilaLibrary(element.library)) continue;
       final name = value.getField('name')?.toStringValue();
       if (name != null && name.isNotEmpty) names.add(name);
     }
@@ -584,7 +595,7 @@ class ControllerGenerator extends GeneratorForAnnotation<Controller> {
       final type = value.type;
       final element = type?.element;
       if (element is! ClassElement) continue;
-      if (!element.library.identifier.contains('gisila')) continue;
+      if (!isGisilaLibrary(element.library)) continue;
       switch (element.name) {
         case 'Path':
           return _ParamAnnotation(

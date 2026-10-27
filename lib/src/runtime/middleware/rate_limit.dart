@@ -1,13 +1,88 @@
-/// Simple token-bucket rate limiter middleware.
+/// Token-bucket rate limiter middleware.
 ///
-/// In-process only. For a real deployment swap in a Redis-backed
-/// implementation by writing your own middleware - the framework has
-/// no opinion on transport.
+/// Buckets live in a [RateLimitStore]. The default keeps them in this
+/// isolate's memory, so a server running several isolates (or several
+/// processes) allows each of them the full rate. Set
+/// `AppConfig.rateLimitStore` to a shared store (e.g. one backed by Redis)
+/// to enforce one limit across all of them.
 library gisila.runtime.middleware.rate_limit;
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:shelf/shelf.dart';
+
+/// Where rate-limit token buckets are kept.
+///
+/// [take] removes one token from the bucket named [key] (created full on
+/// first use), refilling it at [refillPerSecond] up to [capacity] since it
+/// was last used. It returns null when a token was taken, or how long until
+/// one will be available. Keys are already namespaced per limiter.
+abstract class RateLimitStore {
+  FutureOr<Duration?> take(
+    String key, {
+    required double capacity,
+    required double refillPerSecond,
+  });
+}
+
+/// The default [RateLimitStore]: buckets in this isolate's memory.
+class InMemoryRateLimitStore implements RateLimitStore {
+  InMemoryRateLimitStore({this.maxBuckets = 100000});
+
+  /// Upper bound on tracked buckets. Idle (full) buckets are swept first;
+  /// beyond this the least recently used ones are dropped.
+  final int maxBuckets;
+
+  // Insertion order doubles as LRU order: a bucket is re-inserted on
+  // every hit.
+  final _buckets = <String, _Bucket>{};
+  var _lastSweep = DateTime.now();
+
+  @override
+  Duration? take(
+    String key, {
+    required double capacity,
+    required double refillPerSecond,
+  }) {
+    final now = DateTime.now();
+    if (_buckets.length > maxBuckets ||
+        now.difference(_lastSweep) >= const Duration(minutes: 1)) {
+      _sweep(now);
+    }
+    final bucket = _buckets.remove(key) ??
+        _Bucket(
+            tokens: capacity,
+            lastRefill: now,
+            capacity: capacity,
+            refillPerSecond: refillPerSecond);
+    _buckets[key] = bucket;
+    final elapsed = now.difference(bucket.lastRefill).inMilliseconds / 1000.0;
+    bucket.tokens =
+        (bucket.tokens + elapsed * refillPerSecond).clamp(0, capacity);
+    bucket.lastRefill = now;
+    if (bucket.tokens < 1) {
+      return Duration(
+          milliseconds: ((1 - bucket.tokens) / refillPerSecond * 1000).ceil());
+    }
+    bucket.tokens -= 1;
+    return null;
+  }
+
+  void _sweep(DateTime now) {
+    _lastSweep = now;
+    // A bucket idle long enough to refill completely loses nothing when
+    // dropped.
+    _buckets.removeWhere((_, b) =>
+        now.difference(b.lastRefill).inMilliseconds / 1000.0 >=
+        b.capacity / b.refillPerSecond);
+    while (_buckets.length > maxBuckets) {
+      _buckets.remove(_buckets.keys.first);
+    }
+  }
+}
+
+var _anonymousLimiters = 0;
 
 /// Configuration for [rateLimitMiddleware].
 class RateLimitConfig {
@@ -66,53 +141,35 @@ String? clientAddress(Request request,
   return hops.isNotEmpty ? hops.first : peer;
 }
 
+/// Limits requests per client (or per [RateLimitConfig.keyExtractor] key).
+///
+/// Buckets go to [store], defaulting to a fresh [InMemoryRateLimitStore]
+/// for this middleware. With a shared store, [scope] names this limiter so
+/// its buckets are kept apart from other limiters' and are the same in
+/// every isolate (e.g. `GET /users`); without one, a scope unique to this
+/// middleware instance is used.
 Middleware rateLimitMiddleware([
   RateLimitConfig config = const RateLimitConfig(),
   Set<String> trustedProxies = const <String>{},
+  RateLimitStore? store,
+  String? scope,
 ]) {
-  final maxTokens = (config.burstSize ?? config.requestsPerMinute).toDouble();
+  final capacity = (config.burstSize ?? config.requestsPerMinute).toDouble();
   final refillPerSecond = config.requestsPerMinute / 60.0;
   final proxies = <String>{...config.trustedProxies, ...trustedProxies};
   _ProxyMatcher(proxies); // Fail fast on a malformed entry.
   final keyOf = config.keyExtractor ??
       (Request r) => clientAddress(r, trustedProxies: proxies) ?? 'unknown';
-  // Insertion order doubles as LRU order: a bucket is re-inserted on
-  // every hit.
-  final buckets = <String, _Bucket>{};
-  // A bucket idle this long has refilled completely, so dropping it
-  // loses nothing.
-  final idleAfter = Duration(
-    milliseconds: (maxTokens / refillPerSecond * 1000).ceil(),
-  );
-  var lastSweep = DateTime.now();
-
-  void sweep(DateTime now) {
-    lastSweep = now;
-    buckets.removeWhere((_, b) => now.difference(b.lastRefill) >= idleAfter);
-    while (buckets.length > config.maxBuckets) {
-      buckets.remove(buckets.keys.first);
-    }
-  }
+  final buckets =
+      store ?? InMemoryRateLimitStore(maxBuckets: config.maxBuckets);
+  final prefix = scope ?? 'limiter-${_anonymousLimiters++}';
 
   return (Handler inner) {
     return (Request request) async {
-      final now = DateTime.now();
-      if (buckets.length > config.maxBuckets ||
-          now.difference(lastSweep) >= const Duration(minutes: 1)) {
-        sweep(now);
-      }
-
-      final key = keyOf(request);
-      final bucket =
-          buckets.remove(key) ?? _Bucket(tokens: maxTokens, lastRefill: now);
-      buckets[key] = bucket;
-      final elapsed = now.difference(bucket.lastRefill).inMilliseconds / 1000.0;
-      bucket.tokens =
-          (bucket.tokens + elapsed * refillPerSecond).clamp(0, maxTokens);
-      bucket.lastRefill = now;
-
-      if (bucket.tokens < 1) {
-        final retryAfter = ((1 - bucket.tokens) / refillPerSecond).ceil();
+      final wait = await buckets.take('$prefix|${keyOf(request)}',
+          capacity: capacity, refillPerSecond: refillPerSecond);
+      if (wait != null) {
+        final retryAfter = (wait.inMilliseconds / 1000).ceil();
         return Response(
           429,
           body: '{"error":{"status":429,"code":"too_many_requests",'
@@ -123,16 +180,22 @@ Middleware rateLimitMiddleware([
           },
         );
       }
-      bucket.tokens -= 1;
       return inner(request);
     };
   };
 }
 
 class _Bucket {
-  _Bucket({required this.tokens, required this.lastRefill});
+  _Bucket({
+    required this.tokens,
+    required this.lastRefill,
+    required this.capacity,
+    required this.refillPerSecond,
+  });
   double tokens;
   DateTime lastRefill;
+  final double capacity;
+  final double refillPerSecond;
 }
 
 /// Matches addresses against exact IPs and CIDR ranges.

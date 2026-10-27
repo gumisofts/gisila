@@ -16,6 +16,7 @@ import 'db/db_session_middleware.dart';
 import 'exceptions.dart';
 import 'forms/form.dart' show FormValidationException;
 import 'logging/log_event.dart';
+import 'logging/logger.dart';
 import 'middleware/body_limit.dart';
 import 'middleware/cors.dart';
 import 'middleware/rate_limit.dart';
@@ -119,7 +120,7 @@ class GisilaApp {
   /// Builds the full Shelf handler: framework middleware + user
   /// middleware + router.
   Handler buildHandler() {
-    final router = Router();
+    final router = Router(notFoundHandler: _notFound);
     for (final c in _controllers) {
       c.attacher(this, router, prefix: c.prefix);
     }
@@ -147,6 +148,11 @@ class GisilaApp {
     pipeline = pipeline
         .addMiddleware(requestIdMiddleware(headerName: config.requestIdHeader));
 
+    if (config.healthCheckPath != null) {
+      pipeline = pipeline.addMiddleware(_healthMiddleware(
+          config.healthCheckPath!, config.healthCheck, config.logger));
+    }
+
     // Make sure the service resolver lands on the context that
     // requestIdMiddleware (or a downstream middleware) materialised.
     pipeline = pipeline.addMiddleware((inner) {
@@ -167,8 +173,8 @@ class GisilaApp {
       pipeline = pipeline.addMiddleware(corsMiddleware(config.cors!));
     }
     if (config.rateLimit != null) {
-      pipeline = pipeline.addMiddleware(
-          rateLimitMiddleware(config.rateLimit!, config.trustedProxies));
+      pipeline = pipeline.addMiddleware(rateLimitMiddleware(config.rateLimit!,
+          config.trustedProxies, config.rateLimitStore, 'app'));
     }
     if (config.maxRequestBodyBytes != null) {
       pipeline = pipeline
@@ -234,10 +240,15 @@ class GisilaApp {
 
   /// Starts the HTTP server. Returns the live [HttpServer] so callers
   /// may close it themselves; [stop] is a convenience shortcut.
+  ///
+  /// With [stopOnSignals], SIGINT and SIGTERM (as sent by Ctrl-C, systemd
+  /// or Docker) call [stop] with [drainTimeout] and then end the process.
   Future<HttpServer> start({
     String host = '0.0.0.0',
     int port = 8080,
     SecurityContext? securityContext,
+    bool stopOnSignals = false,
+    Duration drainTimeout = const Duration(seconds: 30),
   }) async {
     await config.cache?.connect();
     final h = buildHandler();
@@ -247,6 +258,18 @@ class GisilaApp {
       port,
       securityContext: securityContext,
     );
+    if (stopOnSignals) {
+      Future<void> onSignal(ProcessSignal signal) async {
+        config.logger.info('gisila: $signal received, shutting down');
+        await stop(drainTimeout: drainTimeout);
+        exit(0);
+      }
+
+      _signalSubs = [
+        ProcessSignal.sigint.watch().listen(onSignal),
+        if (!Platform.isWindows) ProcessSignal.sigterm.watch().listen(onSignal),
+      ];
+    }
     config.logger.info(
       'gisila listening on http://$host:$port',
       fields: <String, Object?>{
@@ -257,12 +280,66 @@ class GisilaApp {
     return _server!;
   }
 
-  Future<void> stop({bool force = false}) async {
+  /// Stops accepting connections and waits up to [drainTimeout] for
+  /// in-flight requests before closing the rest; [force] closes at once.
+  /// Then releases the cache and the database provider.
+  Future<void> stop({
+    bool force = false,
+    Duration drainTimeout = const Duration(seconds: 30),
+  }) async {
     final server = _server;
     if (server == null) return;
-    await server.close(force: force);
     _server = null;
+    for (final sub in _signalSubs) {
+      await sub.cancel();
+    }
+    _signalSubs = const [];
+    if (force) {
+      await server.close(force: true);
+    } else {
+      // A graceful close also waits for idle keep-alive connections, which
+      // may never end on their own: give in-flight requests the timeout,
+      // then close whatever is left.
+      try {
+        await server.close().timeout(drainTimeout);
+      } on TimeoutException {
+        config.logger.warning('gisila: connections still open after '
+            '${drainTimeout.inMilliseconds} ms; closing them');
+        await server.close(force: true);
+      }
+    }
     await config.cache?.disconnect();
+    await config.database?.dispose();
+  }
+
+  List<StreamSubscription<ProcessSignal>> _signalSubs = const [];
+
+  /// Answers [path] without touching auth, routing or the database.
+  static Middleware _healthMiddleware(
+      String path, Future<bool> Function()? check, Logger logger) {
+    final normalized = path.startsWith('/') ? path.substring(1) : path;
+    return (Handler inner) => (Request request) async {
+          if (request.method != 'GET' || request.url.path != normalized) {
+            return inner(request);
+          }
+          var healthy = true;
+          if (check != null) {
+            try {
+              healthy = await check();
+            } catch (e, st) {
+              logger.warning('health check failed: $e', stackTrace: st);
+              healthy = false;
+            }
+          }
+          return Response(
+            healthy ? 200 : 503,
+            body: healthy ? '{"status":"ok"}' : '{"status":"unavailable"}',
+            headers: const {
+              'content-type': 'application/json; charset=utf-8',
+              'cache-control': 'no-store',
+            },
+          );
+        };
   }
 
   /// Resolves the [GisilaApp] previously attached to [request], if
@@ -327,6 +404,18 @@ class GisilaApp {
       };
     };
   }
+
+  /// Unmatched routes answer in the same JSON envelope as other errors.
+  static Response _notFound(Request request) => Response.notFound(
+        jsonEncode(<String, Object?>{
+          'error': <String, Object?>{
+            'status': 404,
+            'code': 'not_found',
+            'message': 'No route for ${request.method} /${request.url.path}',
+          },
+        }),
+        headers: const {'content-type': 'application/json; charset=utf-8'},
+      );
 
   Middleware _serverHeadersMiddleware() {
     return (Handler inner) {

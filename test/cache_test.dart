@@ -34,9 +34,11 @@ void main() {
     });
 
     test('TTL expiry evicts entries', () async {
-      await cache.set('ttl', 'x', ttl: const Duration(milliseconds: 50));
+      // Margins wide enough for a loaded machine (the suite runs the
+      // build_test-based tests in parallel).
+      await cache.set('ttl', 'x', ttl: const Duration(milliseconds: 500));
       expect(await cache.get('ttl'), 'x');
-      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await Future<void>.delayed(const Duration(milliseconds: 900));
       expect(await cache.get('ttl'), isNull);
     });
 

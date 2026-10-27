@@ -61,10 +61,14 @@ typedef GisilaRouteHandler = FutureOr<Response> Function(RequestContext ctx);
 /// 6. Per-route timeout.
 /// 7. AuthN/AuthZ guard (read straight from `config.permissions` etc.).
 /// 8. The typed handler.
+///
+/// [routeId] (generated code passes `METHOD path`) names the route's rate
+/// limiter in a shared `AppConfig.rateLimitStore`.
 Handler gisilaRoute({
   required GisilaApp app,
   required RouteConfig config,
   required GisilaRouteHandler handler,
+  String? routeId,
 }) {
   final effective = app.config.defaultRouteConfig.merge(config);
 
@@ -116,6 +120,9 @@ Handler gisilaRoute({
     current = rateLimitMiddleware(
       effective.rateLimit!,
       app.config.trustedProxies,
+      app.config.rateLimitStore,
+      // A shared store needs a name that is the same in every isolate.
+      routeId == null ? null : 'route:$routeId',
     )(current);
   }
 

@@ -157,6 +157,12 @@ ConstructorElement? fromFormConstructor(ClassElement cls) {
   return null;
 }
 
+/// True for a library of package:gisila itself. Annotations are matched by
+/// where they are declared, not by name: a `Public` or `Roles` class from
+/// any other package (even one named like `gisila_extras`) is not ours.
+bool isGisilaLibrary(LibraryElement library) =>
+    library.identifier.startsWith('package:gisila/');
+
 /// Quotes [value] as a Dart single-quoted string literal.
 String dartString(String value) {
   final escaped = value
