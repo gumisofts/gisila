@@ -59,6 +59,9 @@
   `FormatException` → `400` catch. An error thrown by the controller method
   itself used to come back as a `400` echoing its text; it now reaches the
   error handler as a `500`. Regenerate with `build_runner`.
+* `RateLimitConfig.keyExtractor` set in a route's `config:` (a top-level
+  function or a static method) is now carried into the generated code; the
+  generator used to drop it, so every route keyed on the client address.
 * JSON responses send an enum without a `toJson()` as its `name` (`"red"`);
   they used to send `toString()` (`"Color.red"`).
 * An empty query value (`?page=`) counts as not given for non-string
