@@ -2,6 +2,42 @@
 
 ## Unreleased — pipeline hardening
 
+- Security: code generation matched annotations by name and by any library
+  URI containing "gisila", so a `Public` from another package (say
+  `gisila_extras`) made a route public and dropped the class's
+  `@RequireAuth`. Annotations must now come from `package:gisila/`.
+- `@Get('/')` under `@Controller('/users')` answers both `/users/` and
+  `/users` (it used to 404 on `/users`).
+- `stop(drainTimeout:)` waits for in-flight requests (30 s by default) and
+  then force-closes; it now also calls the new `DatabaseProvider.dispose()`.
+  `start(stopOnSignals: true)` stops gracefully on SIGINT/SIGTERM.
+  `AppConfig.healthCheckPath` (e.g. `'/healthz'`) serves a liveness probe
+  outside auth and routing, with an optional `healthCheck` (503 on false).
+- Defaults: no `Server` header and no `X-Powered-By` unless set
+  (`serverHeader`, `poweredByHeader`). Unmatched routes answer a JSON 404
+  in the error envelope. In JSON logs, fields can no longer overwrite
+  `ts`, `level`, `msg`.
+- Docs: the pipeline order in `doc/middleware.md` matches the code, and the
+  library example uses `registerController(attacher: ...)`.
+
+- Rate limits can be shared across isolates and processes:
+  `AppConfig.rateLimitStore` takes a `RateLimitStore` (implement `take` on
+  Redis, for example); the default `InMemoryRateLimitStore` keeps today's
+  per-isolate behaviour. Generated routes pass `gisilaRoute(routeId:
+  'METHOD path')` so each route's buckets have the same name in every
+  isolate. `rateLimitMiddleware` takes optional `store` and `scope`.
+
+- Fix: `RouteConfig(timeout: ...)` and `CorsConfig(maxAge: ...)` set in an
+  annotation were dropped by code generation on current Dart SDKs (the
+  emitter read the `Duration` constant's old private field). Routes now get
+  their timeout.
+- Tests: `pipeline_integration_test` runs a generated controller
+  (`test/fixtures/guarded_controller.dart`) through `buildHandler()`:
+  guards, form and parameter binding, route timeout and rate limit, error
+  mapping, CORS pre-flight, request ids. `generated_golden_test` fails when
+  the generated code for that fixture changes (`GISILA_UPDATE_GOLDEN=1` to
+  accept it).
+
 ### Security
 
 * **Rate limiter keys on the real client.** The default key is now the

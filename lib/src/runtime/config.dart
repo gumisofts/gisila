@@ -36,11 +36,14 @@ class AppConfig {
     this.requestIdHeader = 'X-Request-Id',
     this.cors,
     this.rateLimit,
+    this.rateLimitStore,
     this.trustedProxies = const <String>{'127.0.0.1', '::1'},
     this.defaultRouteConfig = RouteConfig.empty,
     this.errorHandler,
-    this.serverHeader = 'gisila/0.2.0',
-    this.poweredByHeader = true,
+    this.serverHeader = '',
+    this.healthCheckPath,
+    this.healthCheck,
+    this.poweredByHeader = false,
     this.requestTimeout,
     this.maxRequestBodyBytes,
     this.extra = const <String, Object?>{},
@@ -113,6 +116,12 @@ class AppConfig {
   /// config.
   final RateLimitConfig? rateLimit;
 
+  /// Where the app-wide and per-route rate limiters keep their buckets.
+  /// Null gives each limiter its own in-memory store, so every isolate or
+  /// process allows the full rate; pass a shared store (e.g. Redis-backed)
+  /// to enforce one limit across all of them.
+  final RateLimitStore? rateLimitStore;
+
   /// Reverse proxies (exact IPs or CIDR ranges) allowed to report the
   /// client address via `X-Forwarded-For`. Used by the rate limiter's
   /// default key (see [clientAddress]); empty means the header is
@@ -135,10 +144,21 @@ class AppConfig {
   /// [HttpException]-aware behaviour.
   final ErrorHandler? errorHandler;
 
-  /// Value of the `Server` header (set to empty to disable).
+  /// Path answering liveness probes (`GET`, no auth, before every other
+  /// middleware except the request id), e.g. `'/healthz'`. Null (the
+  /// default) serves none. It answers `{"status":"ok"}`, or `503` with
+  /// `{"status":"unavailable"}` when [healthCheck] returns false or throws.
+  final String? healthCheckPath;
+
+  /// Optional readiness check for [healthCheckPath], e.g. a database ping.
+  final Future<bool> Function()? healthCheck;
+
+  /// Value of the `Server` header; empty (the default) sends none, so the
+  /// framework and its version aren't advertised.
   final String serverHeader;
 
-  /// Send an `X-Powered-By': 'gisila` header on every response.
+  /// Send an `X-Powered-By: gisila` header on every response. Off by
+  /// default.
   final bool poweredByHeader;
 
   /// Hard ceiling for how long a single request may take. Requests

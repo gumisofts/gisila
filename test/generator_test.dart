@@ -112,4 +112,44 @@ void main() {
       expect(h, contains('this.ping()'));
     });
   });
+
+  test('a look-alike annotation from another package is ignored (FW-15)',
+      () async {
+    final rw = TestReaderWriter(rootPackage: 'my_app');
+    await rw.testing.loadIsolateSources();
+    String? generated;
+    await testBuilder(
+      controllerBuilder(BuilderOptions.empty),
+      {
+        // Its URI contains "gisila", which used to be enough.
+        'my_app|lib/gisila_fake.dart': 'class Public { const Public(); }',
+        'my_app|lib/sample.dart': r'''
+import 'package:gisila/gisila.dart' hide Public;
+import 'gisila_fake.dart' as fake;
+
+part 'sample.g.dart';
+
+@Controller('/x')
+@RequireAuth()
+class FakeController {
+  @Get('/secret')
+  @fake.Public()
+  Future<Map<String, Object?>> secret() async => <String, Object?>{};
+}
+''',
+      },
+      rootPackage: 'my_app',
+      readerWriter: rw,
+      outputs: {
+        'my_app|lib/sample.gisila.g.part':
+            decodedMatches(predicate<String>((s) {
+          generated = s;
+          return true;
+        })),
+      },
+    );
+    final squashed = generated!.replaceAll(RegExp(r'\s+'), '');
+    expect(squashed, contains('requireAuth:true'));
+    expect(squashed, isNot(contains('isPublic:true')));
+  }, timeout: const Timeout(Duration(minutes: 3)));
 }

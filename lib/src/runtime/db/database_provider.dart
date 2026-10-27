@@ -39,4 +39,9 @@ abstract class DatabaseProvider<S> {
   /// per-request transactions should `commit` / `rollback`
   /// accordingly.
   Future<void> close(S session, {required bool ok});
+
+  /// Releases the provider itself (a connection pool, say). Called by
+  /// `GisilaApp.stop()` after in-flight requests have finished. No-op by
+  /// default.
+  Future<void> dispose() async {}
 }

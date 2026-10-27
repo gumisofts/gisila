@@ -152,9 +152,11 @@ String? _emitCorsConfigLiteral(DartObject? obj) {
 
 String? _emitDurationLiteral(DartObject? obj) {
   if (obj == null || obj.isNull) return null;
-  // `Duration` stores its value in the private `_duration` field
-  // (microseconds since 0). Analyzer surfaces it directly.
-  final us = obj.getField('_duration')?.toIntValue();
+  // The constant's stored field: `inMicroseconds` in current SDKs, the
+  // private `_duration` in older ones. Without either the value would be
+  // dropped silently (as `timeout:` was on Dart 3.13).
+  final us = (obj.getField('inMicroseconds') ?? obj.getField('_duration'))
+      ?.toIntValue();
   if (us != null) {
     return 'const Duration(microseconds: $us)';
   }

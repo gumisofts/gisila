@@ -34,7 +34,11 @@
 ///     ),
 ///   );
 ///
-///   app.registerController(UsersController());
+///   // `attachToApp` is generated for every @Controller class.
+///   app.registerController(
+///     attacher: (app, router, {prefix = ''}) =>
+///         UsersController().attachToApp(app, router, prefix: prefix),
+///   );
 ///
 ///   await app.start(host: '0.0.0.0', port: 8080);
 /// }

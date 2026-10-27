@@ -141,7 +141,10 @@ class ConsoleLogger extends Logger {
     return buf.toString();
   }
 
+  // Fields go first so the event's own keys win: a field named `level` or
+  // `msg` (say, copied from user input) can't rewrite what the line says.
   String _formatJson(LogEvent e) => jsonEncode(<String, Object?>{
+        ...e.fields,
         'ts': e.timestamp.toIso8601String(),
         'level': e.level.name,
         'msg': e.message,
@@ -149,6 +152,5 @@ class ConsoleLogger extends Logger {
         if (e.principalId != null) 'principalId': e.principalId,
         if (e.error != null) 'error': e.error.toString(),
         if (e.stackTrace != null) 'stack': e.stackTrace.toString(),
-        ...e.fields,
       });
 }

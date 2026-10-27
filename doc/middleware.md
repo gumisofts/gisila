@@ -30,16 +30,21 @@ to inner; "outer" sees the request first and the response last):
 
 1. **App injection** - puts the `GisilaApp` on `request.context`.
 2. **Request id** - mints / echoes `X-Request-Id`.
-3. **CORS** *(if `AppConfig.cors != null`)*.
-4. **Rate limit** *(if `AppConfig.rateLimit != null`)*.
-5. **Body size limit** *(if `maxRequestBodyBytes != null`)*.
-6. **Access log** *(if `logRequests`)*.
-7. **Error mapper** - turns `HttpException` into JSON envelopes,
+3. **Cache** *(if `AppConfig.cache != null`)*.
+4. **CORS** *(if `AppConfig.cors != null`)* - answers pre-flights.
+5. **Rate limit** *(if `AppConfig.rateLimit != null`)*.
+6. **Body size limit** *(if `maxRequestBodyBytes != null`)*.
+7. **Access log** *(if `logRequests`)*.
+8. **Error mapper** - turns `HttpException` into JSON envelopes,
    forwards everything else through `AppConfig.errorHandler`.
-8. **Your global middleware** (in registration order).
-9. **Server headers** - `Server`, `X-Powered-By`.
-10. **Request timeout** *(if `requestTimeout != null`)*.
-11. **Router** → controller-level guards / named middleware → handler.
+9. **DB session** *(if `AppConfig.database != null`)* - inside the layers
+   above, so pre-flights and rejected requests never take a connection.
+10. **Your global middleware** (in registration order).
+11. **Server headers** - `Server`, `X-Powered-By`.
+12. **Request timeout** *(if `requestTimeout != null`)*.
+13. **Router** → per-route pipeline (CORS override, rate limit, content
+    types, body cap, named middleware, route timeout, auth guard) →
+    handler.
 
 The error mapper sits **above** your handlers so any exception you
 `throw` from a route bubbles up and becomes a uniform JSON response.

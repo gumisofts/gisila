@@ -49,5 +49,25 @@ void main() {
       expect(record['where'], 'codec');
       expect(record['ts'], isA<String>());
     });
+
+    test("JSON fields can't overwrite the record's own keys (FW-14)", () {
+      final lines = <String>[];
+      final logger = ConsoleLogger(
+        format: LogFormat.json,
+        stdoutSink: lines.add,
+        stderrSink: lines.add,
+      );
+      logger.warning('real', fields: <String, Object?>{
+        'level': 'info',
+        'msg': 'forged',
+        'ts': 'never',
+        'kept': 1,
+      });
+      final record = jsonDecode(lines.single) as Map<String, dynamic>;
+      expect(record['level'], 'warning');
+      expect(record['msg'], 'real');
+      expect(record['ts'], isNot('never'));
+      expect(record['kept'], 1);
+    });
   });
 }
