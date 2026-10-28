@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — pipeline hardening
+## 0.3.0 — 2026-10-28 — pipeline hardening (BREAKING)
 
 - Security: code generation matched annotations by name and by any library
   URI containing "gisila", so a `Public` from another package (say
