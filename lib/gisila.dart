@@ -61,6 +61,7 @@ export 'src/annotations/params.dart';
 export 'src/annotations/permission.dart';
 export 'src/runtime/app.dart';
 export 'src/runtime/auth/authenticator.dart';
+export 'src/runtime/auth/api_key.dart';
 export 'src/runtime/auth/jwt.dart';
 export 'src/runtime/auth/permission_resolver.dart';
 export 'src/runtime/auth/principal.dart';
@@ -94,6 +95,7 @@ export 'src/runtime/route_config.dart';
 export 'src/runtime/route_runtime.dart' show GisilaRouteHandler, gisilaRoute;
 // Service layer.
 export 'src/runtime/service.dart';
+export 'src/runtime/static_files.dart';
 // Content-type-aware body parsing.
 export 'src/runtime/parsers/body_parser.dart'
     show DecodedBody, readBody, readFormBody;

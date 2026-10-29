@@ -46,3 +46,36 @@ class StaticTokenAuthenticator extends Authenticator {
     return _tokens[token];
   }
 }
+
+/// Tries [authenticators] in order and returns the first principal found,
+/// so an API can take, say, JWTs from browsers and API keys from scripts:
+///
+/// ```dart
+/// CompositeAuthenticator([
+///   JwtAuthenticator(key: key, algorithms: {'HS256'}),
+///   ApiKeyAuthenticator(lookup: findKey),
+/// ])
+/// ```
+///
+/// An authenticator that throws (credentials present but bad) ends the
+/// search with that error: a rejected token is never retried as something
+/// else.
+class CompositeAuthenticator extends Authenticator {
+  CompositeAuthenticator(Iterable<Authenticator> authenticators)
+      : authenticators = List.unmodifiable(authenticators) {
+    if (this.authenticators.isEmpty) {
+      throw ArgumentError.value(authenticators, 'authenticators', 'is empty');
+    }
+  }
+
+  final List<Authenticator> authenticators;
+
+  @override
+  Future<Principal?> authenticate(Request request) async {
+    for (final a in authenticators) {
+      final principal = await a.authenticate(request);
+      if (principal != null) return principal;
+    }
+    return null;
+  }
+}

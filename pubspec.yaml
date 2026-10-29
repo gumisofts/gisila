@@ -21,6 +21,7 @@ dependencies:
   # Body parsing: form-urlencoded + multipart/form-data on top of JSON.
   http_parser: ^4.0.2
   mime: ^1.0.4
+  path: ^1.8.0
   # JWT signature verification and signing (JwtAuthenticator, JwtSigner).
   dart_jsonwebtoken: ^3.4.1
   # ETag hashing.
