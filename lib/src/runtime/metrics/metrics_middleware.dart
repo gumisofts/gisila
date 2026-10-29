@@ -92,6 +92,9 @@ Middleware metricsMiddleware(MetricsConfig config, MetricsRegistry registry,
         final response = await inner(request);
         status = response.statusCode;
         return response;
+      } on HijackException {
+        status = 101; // upgraded to a WebSocket
+        rethrow;
       } finally {
         inFlight.dec();
         final method =

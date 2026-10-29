@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Server-sent events: `sseResponse(stream)` with `SseEvent` (multi-line
+  data, `event`, `id`, `retry`, comments, `SseEvent.json`), unbuffered
+  output, keep-alive comments and cancellation on disconnect;
+  `lastEventId(request)` for resuming.
+- WebSockets: upgrades via `shelf_web_socket` inside a guarded route now
+  work through the whole pipeline. The error mapper, access log, metrics
+  and DB session let shelf's `HijackException` through (it used to become
+  a logged 500); the upgrade is logged and counted as `101`.
+  `HijackException` is exported.
+- Fix: `logResponseBody` no longer reads bodies of unknown length (event
+  streams, streamed files), which hung such responses.
 - Pagination helpers: `PageParams` (validated, clamped `limit` /
   `offset` / `cursor`; bad values are 400s), `Cursor.encode` / `decode`
   for keyset pagination (malformed cursors are 400 `invalid_cursor`),

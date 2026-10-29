@@ -12,6 +12,7 @@ lines on top of what `gisila` ships with.
 - [Idempotency keys](#idempotency-keys)
 - [File uploads](#file-uploads)
 - [Server-Sent Events](#server-sent-events)
+- [WebSockets](#websockets)
 - [Static files and single-page apps](#static-files-and-single-page-apps)
 - [Health and readiness probes](#health-and-readiness-probes)
 - [Graceful shutdown](#graceful-shutdown)
@@ -232,24 +233,53 @@ Future<Response> putBlob(String id, Request request) async {
 ## Server-Sent Events
 
 ```dart
-@Get('/events')
+@Get('/orders/{id}/events')
 @RequireAuth()
-Future<Response> stream(RequestContext ctx) async {
-  final controller = StreamController<List<int>>();
-  Timer.periodic(const Duration(seconds: 1), (t) {
-    if (controller.isClosed) return t.cancel();
-    controller.add(utf8.encode('data: ${DateTime.now().toIso8601String()}\n\n'));
-  });
-  return Response.ok(controller.stream, headers: {
-    'content-type': 'text/event-stream',
-    'cache-control': 'no-cache',
-    'connection': 'keep-alive',
-  });
+Future<Response> events(String id, RequestContext ctx, OrderService orders) async {
+  final since = lastEventId(ctx.request);          // resume after a reconnect
+  return sseResponse(
+    orders.updates(id, since: since)
+        .map((o) => SseEvent.json(o, event: 'order', id: '${o.version}')),
+  );
 }
 ```
 
-Remember to close the stream when the request is cancelled - hook
-into `request.context['shelf.io.connection']?.onDone`.
+`sseResponse` sets `text/event-stream`, turns off output buffering (so
+each event goes out at once, also through nginx via
+`X-Accel-Buffering: no`) and sends a keep-alive comment every 15 seconds.
+When the browser disconnects, the subscription to your stream is
+cancelled: release resources in its `onCancel`. The route's guards run
+as usual; compression and ETags leave event streams alone.
+
+Browsers' `EventSource` can't send an `Authorization` header. Use a
+cookie, or a short-lived token in the query string read with
+`JwtAuthenticator(tokenFromRequest: ...)`.
+
+## WebSockets
+
+Upgrade inside a normal route with `package:shelf_web_socket`, so the
+route's guards decide who may connect:
+
+```dart
+import 'package:shelf_web_socket/shelf_web_socket.dart';
+
+@Get('/ws')
+@RequireAuth()
+Future<Response> socket(RequestContext ctx) async =>
+    webSocketHandler(
+      (channel, protocol) {
+        final user = ctx.principal!.id;
+        channel.stream.listen((message) => channel.sink.add('$user: $message'));
+      },
+      allowedOrigins: ['https://app.example.com'],
+    )(ctx.request);
+```
+
+Always pass `allowedOrigins`: browsers don't apply CORS to WebSockets,
+so without it any site can open a socket with your users' cookies.
+The upgrade shows as status `101` in the access log and metrics. A
+per-request database session is committed when the upgrade happens, so
+open your own connections inside the socket handler.
 
 ## Static files and single-page apps
 

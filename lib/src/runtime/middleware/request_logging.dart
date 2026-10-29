@@ -50,7 +50,11 @@ Middleware requestLoggingMiddleware({
 
         String? responseBody;
         var res = response;
-        if (logResponseBody) {
+        // Streams of unknown length (server-sent events, file downloads)
+        // may never end: leave them unread.
+        if (logResponseBody &&
+            response.contentLength != null &&
+            response.mimeType != 'text/event-stream') {
           responseBody = await response.readAsString();
           res = response.change(body: responseBody);
         }
@@ -76,6 +80,23 @@ Middleware requestLoggingMiddleware({
           },
         ));
         return res;
+      } on HijackException {
+        stopwatch.stop();
+        logger.log(LogEvent(
+          level: level,
+          message: '${request.method} ${request.requestedUri.path} '
+              '-> 101 upgraded (${stopwatch.elapsedMilliseconds}ms)',
+          timestamp: DateTime.now().toUtc(),
+          requestId: requestId,
+          principalId: ctx?.principal?.id,
+          fields: <String, Object?>{
+            'method': request.method,
+            'path': request.requestedUri.path,
+            'status': 101,
+            'duration_ms': stopwatch.elapsedMilliseconds,
+          },
+        ));
+        rethrow;
       } catch (error, stack) {
         stopwatch.stop();
         logger.log(LogEvent(

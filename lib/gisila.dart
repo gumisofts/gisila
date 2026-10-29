@@ -49,7 +49,7 @@ library gisila;
 // generated controller code (and most user code) needs, so a single
 // `import 'package:gisila/gisila.dart';` is enough.
 export 'package:shelf/shelf.dart'
-    show Handler, Middleware, Pipeline, Request, Response;
+    show Handler, HijackException, Middleware, Pipeline, Request, Response;
 // Full shelf_router export (minus its `Route` class, which clashes
 // with our own [Route] annotation) so generated handlers can rely on
 // the `request.params` extension getter.
@@ -96,6 +96,7 @@ export 'src/runtime/route_runtime.dart' show GisilaRouteHandler, gisilaRoute;
 // Service layer.
 export 'src/runtime/pagination.dart';
 export 'src/runtime/service.dart';
+export 'src/runtime/sse.dart';
 export 'src/runtime/static_files.dart';
 // Content-type-aware body parsing.
 export 'src/runtime/parsers/body_parser.dart'
