@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Security headers on by default (`AppConfig.securityHeaders`):
+  `Strict-Transport-Security` (180 days), `X-Content-Type-Options:
+  nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, and
+  `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'`
+  on non-HTML responses (HTML gets a CSP only from
+  `htmlContentSecurityPolicy`). Headers a handler sets are kept;
+  `securityHeaders: null` turns them off. Behaviour change: responses
+  that had none of these headers now have them.
 - `JwtAuthenticator`: verifies bearer JWTs and maps them to a `Principal`
   (`sub`, `roles`, `scope` / `permissions` by default, or your own
   `toPrincipal`, which can load the user and return `null` to reject).

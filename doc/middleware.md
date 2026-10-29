@@ -29,20 +29,22 @@ middleware, and the patterns for plugging your own in.
 to inner; "outer" sees the request first and the response last):
 
 1. **App injection** - puts the `GisilaApp` on `request.context`.
-2. **Request id** - mints / echoes `X-Request-Id`.
-3. **Cache** *(if `AppConfig.cache != null`)*.
-4. **CORS** *(if `AppConfig.cors != null`)* - answers pre-flights.
-5. **Rate limit** *(if `AppConfig.rateLimit != null`)*.
-6. **Body size limit** *(if `maxRequestBodyBytes != null`)*.
-7. **Access log** *(if `logRequests`)*.
-8. **Error mapper** - turns `HttpException` into JSON envelopes,
+2. **Security headers** *(unless `AppConfig.securityHeaders` is null)* -
+   outside everything else, so early answers carry them too.
+3. **Request id** - mints / echoes `X-Request-Id`.
+4. **Cache** *(if `AppConfig.cache != null`)*.
+5. **CORS** *(if `AppConfig.cors != null`)* - answers pre-flights.
+6. **Rate limit** *(if `AppConfig.rateLimit != null`)*.
+7. **Body size limit** *(if `maxRequestBodyBytes != null`)*.
+8. **Access log** *(if `logRequests`)*.
+9. **Error mapper** - turns `HttpException` into JSON envelopes,
    forwards everything else through `AppConfig.errorHandler`.
-9. **DB session** *(if `AppConfig.database != null`)* - inside the layers
-   above, so pre-flights and rejected requests never take a connection.
-10. **Your global middleware** (in registration order).
-11. **Server headers** - `Server`, `X-Powered-By`.
-12. **Request timeout** *(if `requestTimeout != null`)*.
-13. **Router** → per-route pipeline (CORS override, rate limit, content
+10. **DB session** *(if `AppConfig.database != null`)* - inside the layers
+    above, so pre-flights and rejected requests never take a connection.
+11. **Your global middleware** (in registration order).
+12. **Server headers** - `Server`, `X-Powered-By`.
+13. **Request timeout** *(if `requestTimeout != null`)*.
+14. **Router** → per-route pipeline (CORS override, rate limit, content
     types, body cap, named middleware, route timeout, auth guard) →
     handler.
 
@@ -54,6 +56,7 @@ The error mapper sits **above** your handlers so any exception you
 | Middleware                       | Enabled when                                  | Configured via                                  |
 | -------------------------------- | --------------------------------------------- | ----------------------------------------------- |
 | Request-id propagation           | always                                        | `AppConfig.requestIdHeader`                     |
+| Security headers (HSTS, CSP, …)  | `AppConfig.securityHeaders != null` (default) | `SecurityHeadersConfig`                         |
 | Structured access log            | `AppConfig.logRequests` (default)             | `AppConfig.logger`                              |
 | CORS (incl. pre-flight)          | `AppConfig.cors != null`                      | `CorsConfig`                                    |
 | Token-bucket rate limit          | `AppConfig.rateLimit != null`                 | `RateLimitConfig`                               |

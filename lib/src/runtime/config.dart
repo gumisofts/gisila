@@ -13,6 +13,7 @@ import 'logging/log_event.dart';
 import 'logging/logger.dart';
 import 'middleware/cors.dart';
 import 'middleware/rate_limit.dart';
+import 'middleware/security_headers.dart';
 import 'route_config.dart';
 
 /// Translates an uncaught exception thrown by a controller method (or
@@ -35,6 +36,7 @@ class AppConfig {
     this.cache,
     this.requestIdHeader = 'X-Request-Id',
     this.cors,
+    this.securityHeaders = const SecurityHeadersConfig(),
     this.rateLimit,
     this.rateLimitStore,
     this.trustedProxies = const <String>{'127.0.0.1', '::1'},
@@ -111,6 +113,12 @@ class AppConfig {
 
   /// If non-null, the CORS middleware is registered with this config.
   final CorsConfig? cors;
+
+  /// Browser security headers added to every response (HSTS, nosniff,
+  /// `X-Frame-Options`, `Referrer-Policy`, a locked-down CSP on non-HTML
+  /// responses). On by default; `null` turns them all off, and each field
+  /// of [SecurityHeadersConfig] can be turned off on its own.
+  final SecurityHeadersConfig? securityHeaders;
 
   /// If non-null, the rate-limit middleware is registered with this
   /// config.

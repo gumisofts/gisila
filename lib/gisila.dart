@@ -83,6 +83,7 @@ export 'src/runtime/middleware/content_type.dart';
 export 'src/runtime/middleware/cors.dart';
 export 'src/runtime/middleware/rate_limit.dart';
 export 'src/runtime/middleware/request_id.dart';
+export 'src/runtime/middleware/security_headers.dart';
 // Per-route configuration.
 export 'src/runtime/route_config.dart';
 export 'src/runtime/route_runtime.dart' show GisilaRouteHandler, gisilaRoute;

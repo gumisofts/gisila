@@ -22,6 +22,7 @@ import 'middleware/cors.dart';
 import 'middleware/rate_limit.dart';
 import 'middleware/request_id.dart';
 import 'middleware/request_logging.dart';
+import 'middleware/security_headers.dart';
 import 'middleware/timeout.dart';
 import 'service.dart';
 
@@ -144,6 +145,13 @@ class GisilaApp {
         return inner(req);
       };
     });
+
+    // Outside everything that can answer early (health, CORS, rate
+    // limits, errors), so those responses carry the headers too.
+    if (config.securityHeaders != null) {
+      pipeline = pipeline
+          .addMiddleware(securityHeadersMiddleware(config.securityHeaders!));
+    }
 
     pipeline = pipeline
         .addMiddleware(requestIdMiddleware(headerName: config.requestIdHeader));

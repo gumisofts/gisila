@@ -16,6 +16,7 @@ know.
 - [Request timeout](#request-timeout)
 - [Body size limit](#body-size-limit)
 - [Error handling](#error-handling)
+- [Security headers](#security-headers)
 - [Server headers](#server-headers)
 - [Extra slot](#extra-slot)
 - [Common config recipes](#common-config-recipes)
@@ -34,12 +35,13 @@ know.
 | `permissionResolver`   | `PermissionResolver`      | `ClaimsPermissionResolver`         | Checks roles/perms on the principal. |
 | `requestIdHeader`      | `String`                  | `'X-Request-Id'`                   | Header used by the request-id middleware. |
 | `cors`                 | `CorsConfig?`             | `null`                             | Enables CORS middleware when non-null. |
+| `securityHeaders`      | `SecurityHeadersConfig?`  | `SecurityHeadersConfig()`          | HSTS, nosniff, framing, referrer and CSP headers; `null` sends none. |
 | `rateLimit`            | `RateLimitConfig?`        | `null`                             | Enables the token-bucket rate limiter. |
 | `requestTimeout`       | `Duration?`               | `null`                             | Aborts requests after this duration (504). |
 | `maxRequestBodyBytes`  | `int?`                    | `null`                             | 413 when request body exceeds this. |
 | `errorHandler`         | `ErrorHandler?`           | `null`                             | Maps uncaught exceptions to a `Response`. |
-| `serverHeader`         | `String`                  | `'gisila/0.1.0'`               | Value of the `Server` response header. |
-| `poweredByHeader`      | `bool`                    | `true`                             | Sends `X-Powered-By: gisila`. |
+| `serverHeader`         | `String`                  | `''`                               | Value of the `Server` response header; empty sends none. |
+| `poweredByHeader`      | `bool`                    | `false`                            | Sends `X-Powered-By: gisila`. |
 | `extra`                | `Map<String, Object?>`    | `const {}`                         | Free-form slot for user middleware. |
 
 ## Logging
@@ -217,6 +219,37 @@ AppConfig(
 * The default handler logs the exception at `error` level and
   returns a generic `500` envelope.
 * Full reference: [error-handling.md](error-handling.md).
+
+## Security headers
+
+Every response gets these unless the handler already set the header:
+
+| Header | Default |
+| ------ | ------- |
+| `Strict-Transport-Security` | `max-age=15552000` (180 days) |
+| `X-Content-Type-Options` | `nosniff` |
+| `X-Frame-Options` | `DENY` |
+| `Referrer-Policy` | `no-referrer` |
+| `Content-Security-Policy` | `default-src 'none'; frame-ancestors 'none'` on non-HTML responses; none on `text/html` |
+
+HTML pages (API docs, an admin UI) get no CSP by default because a
+policy that doesn't fit the page breaks it. Write one for them with
+`htmlContentSecurityPolicy`. Browsers ignore HSTS over plain http, so it
+is safe behind a TLS-terminating proxy.
+
+```dart
+AppConfig(
+  securityHeaders: const SecurityHeadersConfig(
+    hsts: HstsConfig(maxAge: Duration(days: 365), includeSubDomains: true),
+    frameOptions: null,                      // null leaves a header out
+    htmlContentSecurityPolicy: "default-src 'self'",
+    extra: {'Permissions-Policy': 'camera=(), geolocation=()'},
+  ),
+);
+```
+
+`securityHeaders: null` turns them all off. A single route can override
+one by setting it on its response.
 
 ## Server headers
 
