@@ -3,8 +3,12 @@ description: >-
   A Shelf-based web framework with annotation-driven routing, declarative
   permission/role checks, pluggable middleware, configurable structured
   logging, and a small build_runner code generator.
-version: 0.3.0
+version: 0.4.0
 repository: https://github.com/gumisofts/gisila
+
+# Throwaway keys used only by the JWT tests.
+false_secrets:
+  - /test/fixtures/jwt_keys.dart
 
 environment:
   sdk: ^3.3.0

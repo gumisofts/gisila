@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 — 2026-10-30 — JWT auth, test client, metrics, security headers
+
+Behaviour change: responses now carry security headers by default
+(`Strict-Transport-Security`, `X-Content-Type-Options`,
+`X-Frame-Options: DENY`, `Referrer-Policy`, and a CSP on non-HTML
+responses). Set `AppConfig(securityHeaders: null)` to keep the 0.3.0
+behaviour. Everything else is additive.
 
 - Metrics: `AppConfig.metrics` records `http_server_requests_total`,
   `http_server_request_duration_seconds` and
