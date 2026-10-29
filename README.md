@@ -106,12 +106,12 @@ the pipeline; controllers stay thin.
 | [Getting started](GETTING_STARTED.md) | Build your first app step by step. |
 | [Controllers and routing](docs/controllers-and-routing.md) | Understand annotations, params, responses. |
 | [Permissions](docs/permissions.md) | Gate routes with auth, roles, or scopes. |
-| [Authentication](docs/authentication.md) | Wire JWT / API keys / sessions / custom resolvers. |
+| [Authentication](docs/authentication.md) | Use the built-in `JwtAuthenticator`, or wire API keys / sessions / custom resolvers. |
 | [Middleware](docs/middleware.md) | Add CORS / rate-limit / tracing / custom logic. |
 | [Logging](docs/logging.md) | Configure formats, custom sinks, redaction. |
 | [Configuration](docs/configuration.md) | Reference for every `AppConfig` field. |
 | [Error handling](docs/error-handling.md) | Use the `HttpException` hierarchy properly. |
-| [Testing](docs/testing.md) | Test controllers / guards / middleware. |
+| [Testing](docs/testing.md) | Test controllers / guards / middleware with `GisilaTestClient`. |
 | [Cookbook](docs/cookbook.md) | Copy-paste recipes for common needs. |
 
 A topic index lives in [docs/README.md](docs/README.md).

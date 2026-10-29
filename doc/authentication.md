@@ -15,7 +15,7 @@ mTLS).
 - [The `PermissionResolver` contract](#the-permissionresolver-contract)
 - [Default behaviour](#default-behaviour)
 - [`StaticTokenAuthenticator`](#statictokenauthenticator)
-- [Recipe: JWT (bearer)](#recipe-jwt-bearer)
+- [`JwtAuthenticator` (built in)](#jwtauthenticator-built-in)
 - [Recipe: API key in header](#recipe-api-key-in-header)
 - [Recipe: cookie session](#recipe-cookie-session)
 - [Recipe: mTLS / client certs](#recipe-mtls--client-certs)
@@ -109,66 +109,118 @@ pre-registered principal. Pass `scheme: 'Token'` to use a different
 auth scheme.
 
 Never check tokens into VCS in production. For real deployments, see
-the JWT recipe below.
+[`JwtAuthenticator`](#jwtauthenticator-built-in) below.
 
-## Recipe: JWT (bearer)
+## `JwtAuthenticator` (built in)
 
-Use any JWT package on pub.dev (e.g. `dart_jsonwebtoken`,
-`corsac_jwt`). The shape stays the same:
-
-```dart
-import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
-import 'package:gisila/gisila.dart';
-
-class JwtAuthenticator extends Authenticator {
-  const JwtAuthenticator(this._secret);
-  final String _secret;
-
-  @override
-  Future<Principal?> authenticate(Request request) async {
-    final header = request.headers['authorization'];
-    if (header == null || !header.startsWith('Bearer ')) return null;
-
-    final token = header.substring('Bearer '.length).trim();
-    final JWT parsed;
-    try {
-      parsed = JWT.verify(token, SecretKey(_secret));
-    } on JWTExpiredException {
-      throw Unauthorized('Token expired');
-    } on JWTException catch (e) {
-      throw Unauthorized('Invalid token: ${e.message}');
-    }
-
-    final payload = parsed.payload as Map<String, dynamic>;
-    final scope = (payload['scope'] as String?) ?? '';
-
-    return Principal(
-      id: payload['sub'] as String,
-      roles: ((payload['roles'] as List?) ?? const []).cast<String>().toSet(),
-      permissions: scope.split(' ').where((s) => s.isNotEmpty).toSet(),
-      claims: payload,
-    );
-  }
-}
-```
-
-Wire it up:
+`JwtAuthenticator` verifies `Authorization: Bearer <jwt>` and turns the
+claims into a `Principal`. `JwtSigner` issues tokens it accepts, so an app
+that logs users in needs no other JWT package.
 
 ```dart
+final key = JwtKey.hmac(Platform.environment['JWT_SECRET']!); // >= 32 bytes
+
 final app = GisilaApp(
   config: AppConfig(
-    authenticator: JwtAuthenticator(Platform.environment['JWT_SECRET']!),
+    authenticator: JwtAuthenticator(
+      key: key,
+      algorithms: {'HS256'},
+      issuer: 'my-app',
+      // Optional: load the user; return null to reject the token.
+      toPrincipal: (claims, request) async {
+        final user = await users.find(claims.subject);
+        if (user == null || !user.isActive) return null;
+        return Principal(
+          id: '${user.id}',
+          roles: {if (user.isStaff) 'staff'},
+          claims: {'user': user},
+        );
+      },
+    ),
   ),
+);
+
+// At login:
+final signer = JwtSigner(
+  key: key,
+  algorithm: 'HS256',
+  issuer: 'my-app',
+  expiresIn: const Duration(days: 30),
+);
+final token = signer.sign(subject: '${user.id}');
+```
+
+Without `toPrincipal`, `sub` becomes the id, the `roles` claim (a list)
+the roles, and `scope` (space-separated) plus `permissions` (a list) the
+permissions. The whole payload lands in `principal.claims`.
+
+What is checked, and why:
+
+| Check | Default | Notes |
+| ----- | ------- | ----- |
+| Algorithm | `algorithms` (required) | The token's `alg` must be in the set. `none` is never accepted. |
+| Key type | always | Each algorithm must fit the key: `JwtAuthenticator(key: <RSA key>, algorithms: {'HS256'})` throws, so a token can't be signed with your public key as an HMAC secret. |
+| `exp` | required | Set `requireExpiry: false` for tokens without one. |
+| `exp` / `nbf` / `iat` | `leeway: 30s` | Allowed clock skew. A future `iat` is rejected. |
+| `iat` age | off | `maxAge: Duration(...)` also requires `iat`. |
+| `iss` | off | `issuer: '...'` must match exactly. |
+| `aud` | off | `audience: {...}` passes when the token's `aud` holds any of them. |
+| `typ` | off | `requiredType: 'at+jwt'` keeps ID tokens out of an access-token API. |
+| HMAC secret | 32 bytes | `JwtKey.hmac` throws on shorter secrets. |
+
+A request without a bearer token is anonymous, so `@Public` routes work
+and guarded routes answer `401 unauthorized`. A token that fails a check
+answers `401` with code `token_expired` (refresh and retry) or
+`invalid_token`; the reason isn't sent to the client.
+
+Other places to read the token from (a cookie, a custom header):
+
+```dart
+JwtAuthenticator(
+  key: key,
+  algorithms: {'HS256'},
+  tokenFromRequest: (request) => readCookie(request, 'session'),
 );
 ```
 
-Tips:
+### Asymmetric keys and key rotation
 
-* Use the `claims` map to forward useful metadata to your handlers -
-  `ctx.principal!.claims['tenant_id']`.
-* Cache the JWKS / signing key if you're using rotating keys.
-* Validate `aud` / `iss` inside `authenticate` and throw
-  `Unauthorized` on mismatch.
+```dart
+// RS256 / ES256: verify with the public key, sign with the private key.
+JwtAuthenticator(key: JwtKey.rsaPublicPem(pem), algorithms: {'RS256'});
+JwtSigner(key: JwtKey.rsaPrivatePem(privatePem), algorithm: 'RS256');
+
+// Several keys, chosen by the token's `kid` (give each key an `id`).
+JwtAuthenticator(
+  keys: StaticJwtKeySet([
+    JwtKey.hmac(newSecret, id: '2026-10'),
+    JwtKey.hmac(oldSecret, id: '2026-04'),
+  ]),
+  algorithms: {'HS256'},
+);
+```
+
+With more than one key, a token without `kid` is rejected rather than
+tried against each key.
+
+### Tokens from an identity provider (JWKS)
+
+```dart
+JwtAuthenticator(
+  keys: RemoteJwks(Uri.parse('https://idp.example.com/.well-known/jwks.json')),
+  algorithms: {'RS256'},
+  issuer: 'https://idp.example.com/',
+  audience: {'my-api'},
+);
+```
+
+`RemoteJwks` caches the document for `cacheFor` (10 minutes), refetches
+early when a token names an unknown `kid` (at most every 30 seconds), and
+keeps using the old keys if a refresh fails. It ignores symmetric and
+private keys in the document, and needs `https` (plain `http` only on
+localhost).
+
+Implement `JwtKeySet` yourself to load keys from somewhere else.
 
 ## Recipe: API key in header
 
@@ -283,7 +335,7 @@ class DatabasePermissionResolver extends PermissionResolver {
 
 final app = GisilaApp(
   config: AppConfig(
-    authenticator: JwtAuthenticator(secret),
+    authenticator: JwtAuthenticator(key: key, algorithms: {'HS256'}),
     permissionResolver: DatabasePermissionResolver(db),
   ),
 );
@@ -348,15 +400,17 @@ specifically; see [error-handling.md](error-handling.md).
 
 ```dart
 test('rejects expired JWTs', () async {
-  final auth = JwtAuthenticator('s');
-  final token = JWT({'sub': 'u1'}, ...).sign(SecretKey('s'),
-      expiresIn: const Duration(seconds: -1));
+  final key = JwtKey.hmac('a-test-secret-that-is-at-least-32-bytes');
+  final auth = JwtAuthenticator(key: key, algorithms: {'HS256'});
+  final token = JwtSigner(key: key, algorithm: 'HS256')
+      .sign(subject: 'u1', expiresIn: const Duration(minutes: -5));
   expect(
     () => auth.authenticate(Request(
       'GET', Uri.parse('http://x/'),
       headers: {'authorization': 'Bearer $token'},
     )),
-    throwsA(isA<HttpException>().having((e) => e.statusCode, 'status', 401)),
+    throwsA(isA<HttpException>()
+        .having((e) => e.code, 'code', 'token_expired')),
   );
 });
 ```

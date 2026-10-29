@@ -8,6 +8,7 @@ in-memory `Handler`, and assert on the resulting `Response` directly.
 ## Table of contents
 
 - [Test layering](#test-layering)
+- [The test client](#the-test-client)
 - [Unit-testing the controller](#unit-testing-the-controller)
 - [Integration test against the full pipeline](#integration-test-against-the-full-pipeline)
 - [Testing the permission guard](#testing-the-permission-guard)
@@ -24,12 +25,75 @@ A useful mental model:
 | Layer                          | Tested with                                        |
 | ------------------------------ | -------------------------------------------------- |
 | Plain method on a controller   | Direct call - bypasses everything framework-y.     |
-| Controller method via routing  | Build a `Handler` and call it with a `Request`.    |
-| Controller + guards            | Same, plus configure an `Authenticator`.           |
+| Controller method via routing  | `GisilaTestClient(app)` - the full pipeline, in memory. |
+| Controller + guards            | Same, with `client.as(principal)` or a real token. |
 | Full HTTP                      | `dart_test_tools` / `shelf_io.serve` on a free port. |
 
 The first three layers run in-process at unit-test speed; reserve the
 fourth for smoke tests.
+
+## The test client
+
+`package:gisila/testing.dart` has `GisilaTestClient`, which sends
+requests through `app.buildHandler()` (request ids, guards, forms,
+error mapping) without a server:
+
+```dart
+import 'package:gisila/gisila.dart';
+import 'package:gisila/testing.dart';
+import 'package:test/test.dart';
+
+void main() {
+  late GisilaTestClient client;
+
+  setUp(() {
+    final app = GisilaApp(
+      config: AppConfig(logRequests: false, authenticator: TestAuthenticator()),
+    );
+    app.registerService<NoteService>(NoteService.new);
+    app.registerController(attacher: NotesController().attachToApp);
+    client = GisilaTestClient(app);
+  });
+
+  test('writers can create notes', () async {
+    final res = await client
+        .as(const Principal(id: 'u1', permissions: {'notes:write'}))
+        .post('/notes', json: {'title': 'hello'});
+    expect(res.statusCode, 201);
+    expect(res.jsonMap['title'], 'hello');
+  });
+
+  test('anonymous callers get the 401 envelope', () async {
+    final res = await client.get('/notes/mine');
+    expect(res.statusCode, 401);
+    expect(res.errorCode, 'unauthorized');
+  });
+}
+```
+
+* Requests: `get`, `post`, `put`, `patch`, `delete`, `head`, `options`,
+  or `request(method, ...)`. Bodies are `json:` (encoded, with
+  `application/json`), `form:` (url-encoded) or a raw `body:` with
+  `contentType:`. `query:` values may be lists for repeated keys.
+* Credentials: `client.as(principal)` needs the app to use a
+  `TestAuthenticator`; give it a `fallback:` to accept real tokens too.
+  `client.withToken(token)` sends any bearer token (one from your
+  `JwtSigner`, say), and `withHeaders({...})` adds headers. Each returns
+  a new client, so the shared one stays anonymous.
+* Responses: `statusCode`, `headers` (case-insensitive), `body`,
+  `json`, `jsonMap`, `jsonList`, and `error` / `errorCode` /
+  `errorMessage` from the error envelope. `toString()` shows the body, so
+  failed `expect`s are readable.
+* `GisilaTestClient.handler(handler)` wraps any Shelf handler.
+
+To test the real JWT path end to end, sign a token with the app's key:
+
+```dart
+final key = JwtKey.hmac('a-test-secret-that-is-at-least-32-bytes');
+// AppConfig(authenticator: JwtAuthenticator(key: key, algorithms: {'HS256'}))
+final token = JwtSigner(key: key, algorithm: 'HS256').sign(subject: 'u1');
+final res = await client.withToken(token).get('/notes/mine');
+```
 
 ## Unit-testing the controller
 
@@ -54,8 +118,8 @@ still a plain Dart method.
 
 ## Integration test against the full pipeline
 
-To exercise routing, body decoding, error mapping, and guards in one
-go, build a `Handler` by hand:
+`GisilaTestClient` (above) covers most needs. To mount a router
+without `GisilaApp.buildHandler()`, build a `Handler` by hand:
 
 ```dart
 import 'package:gisila/gisila.dart';
@@ -170,10 +234,10 @@ construct the authenticator directly without booting the framework:
 
 ```dart
 test('rejects expired JWT', () async {
-  final auth = JwtAuthenticator('test-secret');
-  final token = JWT({'sub': 'u1'},
-      expiresAt: DateTime.now().subtract(const Duration(hours: 1)))
-      .sign(SecretKey('test-secret'));
+  final key = JwtKey.hmac('a-test-secret-that-is-at-least-32-bytes');
+  final auth = JwtAuthenticator(key: key, algorithms: {'HS256'});
+  final token = JwtSigner(key: key, algorithm: 'HS256')
+      .sign(subject: 'u1', expiresIn: const Duration(hours: -1));
 
   expect(
     () => auth.authenticate(Request(

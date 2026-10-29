@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+- `JwtAuthenticator`: verifies bearer JWTs and maps them to a `Principal`
+  (`sub`, `roles`, `scope` / `permissions` by default, or your own
+  `toPrincipal`, which can load the user and return `null` to reject).
+  Tokens must use an algorithm from `algorithms` that fits the key (no
+  `none`, no RSA public key as an HMAC secret) and carry an `exp`;
+  `exp` / `nbf` / `iat` allow `leeway` (30 s); `issuer`, `audience` (any
+  of), `maxAge` and `requiredType` are optional. Rejections are 401 with
+  code `token_expired` or `invalid_token`.
+- `JwtSigner` issues matching tokens. `JwtKey` covers HMAC (at least 32
+  bytes), RSA and EC PEM keys and JWKs; `StaticJwtKeySet` picks keys by
+  `kid` for rotation; `RemoteJwks` loads an identity provider's JWKS
+  with caching and early refresh on unknown `kid`. New dependency:
+  `dart_jsonwebtoken` (signatures only; claim checks are gisila's).
+- `package:gisila/testing.dart`: `GisilaTestClient` sends requests
+  through `app.buildHandler()` in memory (`get` / `post` / ... with
+  `json:`, `form:`, `query:`; `withToken`, `withHeaders`, and `as(principal)`
+  with the new `TestAuthenticator`). `TestResponse` exposes `jsonMap`,
+  `errorCode` and the rest of the error envelope.
+
 ## 0.3.0 — 2026-10-28 — pipeline hardening (BREAKING)
 
 - Security: code generation matched annotations by name and by any library
