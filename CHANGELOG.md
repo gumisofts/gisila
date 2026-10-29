@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Pagination helpers: `PageParams` (validated, clamped `limit` /
+  `offset` / `cursor`; bad values are 400s), `Cursor.encode` / `decode`
+  for keyset pagination (malformed cursors are 400 `invalid_cursor`),
+  and `Page<T>`, which renders `{"items": [...], "page": {...}}` with
+  `has_more`.
 - `ApiKeyAuthenticator`: keys in `X-API-Key` (or `header:` /
   `keyFromRequest:`), looked up by SHA-256 hash so only hashes are
   stored; unknown keys are 401 `invalid_api_key`. `generate(prefix:)`
