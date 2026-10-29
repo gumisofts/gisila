@@ -156,10 +156,18 @@ AppConfig(
 * `keyExtractor` - per-request bucket key. Defaults to
   `X-Forwarded-For` or the peer connection info.
 
-The implementation is an **in-process** token bucket - perfect for a
-single instance, not appropriate for clustered deployments. For
-multi-process limits, write your own middleware backed by Redis;
-see [middleware.md](middleware.md).
+By default each isolate keeps its own token buckets, so a server running
+N isolates (or N servers) allows N times the rate. To share one budget,
+set `rateLimitStore` to a shared store. `package:gisila_redis` has one:
+
+```dart
+AppConfig(
+  rateLimit: const RateLimitConfig(requestsPerMinute: 120),
+  rateLimitStore: RedisRateLimitStore(GisilaRedis.fromUrl(redisUrl)),
+);
+```
+
+Any other backend can implement `RateLimitStore.take`.
 
 When the limit is exceeded:
 
