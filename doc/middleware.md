@@ -32,22 +32,24 @@ to inner; "outer" sees the request first and the response last):
 2. **Security headers** *(unless `AppConfig.securityHeaders` is null)* -
    outside everything else, so early answers carry them too.
 3. **Request id** - mints / echoes `X-Request-Id`.
-4. **Compression** *(if `AppConfig.compression != null`)*.
-5. **ETags** *(if `AppConfig.etags != null`)* - inside compression, so
+4. **Metrics** *(if `AppConfig.metrics != null`)* - serves the metrics
+   path and times everything inside it.
+5. **Compression** *(if `AppConfig.compression != null`)*.
+6. **ETags** *(if `AppConfig.etags != null`)* - inside compression, so
    the tag names the plain body.
-6. **Cache** *(if `AppConfig.cache != null`)*.
-7. **CORS** *(if `AppConfig.cors != null`)* - answers pre-flights.
-8. **Rate limit** *(if `AppConfig.rateLimit != null`)*.
-9. **Body size limit** *(if `maxRequestBodyBytes != null`)*.
-10. **Access log** *(if `logRequests`)*.
-11. **Error mapper** - turns `HttpException` into JSON envelopes,
+7. **Cache** *(if `AppConfig.cache != null`)*.
+8. **CORS** *(if `AppConfig.cors != null`)* - answers pre-flights.
+9. **Rate limit** *(if `AppConfig.rateLimit != null`)*.
+10. **Body size limit** *(if `maxRequestBodyBytes != null`)*.
+11. **Access log** *(if `logRequests`)*.
+12. **Error mapper** - turns `HttpException` into JSON envelopes,
     forwards everything else through `AppConfig.errorHandler`.
-12. **DB session** *(if `AppConfig.database != null`)* - inside the layers
+13. **DB session** *(if `AppConfig.database != null`)* - inside the layers
     above, so pre-flights and rejected requests never take a connection.
-13. **Your global middleware** (in registration order).
-14. **Server headers** - `Server`, `X-Powered-By`.
-15. **Request timeout** *(if `requestTimeout != null`)*.
-16. **Router** → per-route pipeline (CORS override, rate limit, content
+14. **Your global middleware** (in registration order).
+15. **Server headers** - `Server`, `X-Powered-By`.
+16. **Request timeout** *(if `requestTimeout != null`)*.
+17. **Router** → per-route pipeline (CORS override, rate limit, content
     types, body cap, named middleware, route timeout, auth guard) →
     handler.
 
@@ -62,6 +64,7 @@ The error mapper sits **above** your handlers so any exception you
 | Security headers (HSTS, CSP, …)  | `AppConfig.securityHeaders != null` (default) | `SecurityHeadersConfig`                         |
 | Structured access log            | `AppConfig.logRequests` (default)             | `AppConfig.logger`                              |
 | CORS (incl. pre-flight)          | `AppConfig.cors != null`                      | `CorsConfig`                                    |
+| Prometheus metrics               | `AppConfig.metrics != null`                   | `MetricsConfig`                                 |
 | gzip compression                 | `AppConfig.compression != null`               | `CompressionConfig`                             |
 | ETag / 304 Not Modified          | `AppConfig.etags != null`                     | `EtagConfig`                                    |
 | Token-bucket rate limit          | `AppConfig.rateLimit != null`                 | `RateLimitConfig`                               |

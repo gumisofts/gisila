@@ -36,6 +36,7 @@ know.
 | `requestIdHeader`      | `String`                  | `'X-Request-Id'`                   | Header used by the request-id middleware. |
 | `cors`                 | `CorsConfig?`             | `null`                             | Enables CORS middleware when non-null. |
 | `securityHeaders`      | `SecurityHeadersConfig?`  | `SecurityHeadersConfig()`          | HSTS, nosniff, framing, referrer and CSP headers; `null` sends none. |
+| `metrics`              | `MetricsConfig?`          | `null`                             | Request metrics and a Prometheus endpoint ([cookbook.md](cookbook.md#metrics-endpoint)). |
 | `compression`          | `CompressionConfig?`      | `null`                             | gzips compressible responses ([middleware.md](middleware.md#compression-and-etags)). |
 | `etags`                | `EtagConfig?`             | `null`                             | ETags and `304 Not Modified` on `GET` responses. |
 | `rateLimit`            | `RateLimitConfig?`        | `null`                             | Enables the token-bucket rate limiter. |

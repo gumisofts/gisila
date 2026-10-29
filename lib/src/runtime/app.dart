@@ -17,6 +17,9 @@ import 'exceptions.dart';
 import 'forms/form.dart' show FormValidationException;
 import 'logging/log_event.dart';
 import 'logging/logger.dart';
+import 'metrics/metrics.dart';
+import 'metrics/metrics_hub.dart';
+import 'metrics/metrics_middleware.dart';
 import 'middleware/body_limit.dart';
 import 'middleware/compression.dart';
 import 'middleware/cors.dart';
@@ -80,6 +83,12 @@ class GisilaApp {
 
   /// Set while [init] runs or once it finished, until [stop].
   Future<void>? _initialized;
+
+  /// The app's metrics: the framework's HTTP metrics (with
+  /// `AppConfig.metrics`) and any you register.
+  final MetricsRegistry metrics = MetricsRegistry();
+
+  MetricsHubMember? _hubMember;
 
   HttpServer? _server;
 
@@ -204,6 +213,8 @@ class GisilaApp {
 
   /// Disposes singletons (reverse order), then the cache and database.
   Future<void> _shutdown({required bool runStopHooks}) async {
+    _hubMember?.close();
+    _hubMember = null;
     Future<void> guarded(String what, FutureOr<void> Function() f) async {
       try {
         await f();
@@ -289,6 +300,14 @@ class GisilaApp {
     if (config.healthCheckPath != null) {
       pipeline = pipeline.addMiddleware(_healthMiddleware(
           config.healthCheckPath!, config.healthCheck, config.logger));
+    }
+
+    final metricsConfig = config.metrics;
+    if (metricsConfig != null) {
+      final hub = metricsConfig.hub;
+      if (hub != null) _hubMember ??= MetricsHubMember(hub, metrics);
+      pipeline = pipeline.addMiddleware(
+          metricsMiddleware(metricsConfig, metrics, hub: _hubMember));
     }
 
     // Make sure the service resolver lands on the context that
@@ -392,10 +411,14 @@ class GisilaApp {
   ///
   /// With [stopOnSignals], SIGINT and SIGTERM (as sent by Ctrl-C, systemd
   /// or Docker) call [stop] with [drainTimeout] and then end the process.
+  ///
+  /// With [shared], several isolates can each start an app on the same
+  /// port and the connections are spread between them.
   Future<HttpServer> start({
     String host = '0.0.0.0',
     int port = 8080,
     SecurityContext? securityContext,
+    bool shared = false,
     bool stopOnSignals = false,
     Duration drainTimeout = const Duration(seconds: 30),
   }) async {
@@ -406,6 +429,7 @@ class GisilaApp {
       host,
       port,
       securityContext: securityContext,
+      shared: shared,
     );
     if (stopOnSignals) {
       Future<void> onSignal(ProcessSignal signal) async {

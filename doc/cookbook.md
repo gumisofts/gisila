@@ -327,23 +327,70 @@ For anything heavier, use gisila_queue.
 
 ## Metrics endpoint
 
-If you collect Prometheus metrics with a registry, expose them:
+Built in: turn on `AppConfig.metrics` and point Prometheus at
+`/metrics`.
 
 ```dart
-@Controller('/metrics')
-class MetricsController {
-  MetricsController(this._registry);
-  final CollectorRegistry _registry;
+final app = GisilaApp(
+  config: AppConfig(
+    metrics: MetricsConfig(bearerToken: env['METRICS_TOKEN']),
+  ),
+);
 
-  @Get('/') @Public()
-  Future<Response> scrape() async {
-    final body = await _registry.collectAndExport();
-    return Response.ok(body, headers: {
-      'content-type': 'text/plain; version=0.0.4',
-    });
+// Your own metrics live next to the framework's:
+final sent = app.metrics.counter('emails_sent_total',
+    help: 'Emails sent.', labels: ['template']);
+sent.inc({'template': 'welcome'});
+
+final render = app.metrics.histogram('pdf_render_seconds', help: 'PDF time.');
+await render.time(() => renderPdf(order));
+```
+
+What it records:
+
+| Metric | Labels |
+| ------ | ------ |
+| `http_server_requests_total` | `method`, `route`, `status` |
+| `http_server_request_duration_seconds` (histogram) | `method`, `route` |
+| `http_server_requests_in_flight` | |
+| `process_resident_memory_bytes`, `process_start_time_seconds` | |
+
+`route` is the route template (`/users/<id>`), never the raw path, so
+the number of series stays small. Requests no route matched are
+`unmatched`; handlers mounted on the router by hand (docs, admin) are
+`other`. Keep your own label values to a small fixed set too.
+
+Who can read it: with `allow: (request) => ...`, whoever it accepts;
+otherwise with `bearerToken` (16+ characters), requests that send
+`Authorization: Bearer <token>`; otherwise only direct connections from
+loopback without `X-Forwarded-For` / `Forwarded` / `X-Real-IP`, so a
+reverse proxy on the same host doesn't publish it. Anyone else gets a
+404.
+
+### Several isolates on one port
+
+Each isolate has its own numbers, and a scrape lands on whichever isolate
+accepts the connection. Create a `MetricsHub` in the main isolate and
+pass its `sendPort` to every isolate's config; a scrape then gathers and
+sums all of them:
+
+```dart
+Future<void> main() async {
+  final hub = MetricsHub();
+  for (var i = 1; i < Platform.numberOfProcessors; i++) {
+    await Isolate.spawn(serve, hub.sendPort);
   }
+  await serve(hub.sendPort);
+}
+
+Future<void> serve(SendPort hub) async {
+  final app = GisilaApp(config: AppConfig(metrics: MetricsConfig(hub: hub)));
+  ...
+  await app.start(port: 8080, shared: true);
 }
 ```
+
+An isolate that stops answering is dropped after three scrapes.
 
 ## OpenTelemetry tracing
 

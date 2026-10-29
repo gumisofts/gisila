@@ -11,6 +11,7 @@ import 'db/db_error_mapper.dart';
 import 'exceptions.dart';
 import 'logging/log_event.dart';
 import 'logging/logger.dart';
+import 'metrics/metrics_middleware.dart';
 import 'middleware/compression.dart';
 import 'middleware/cors.dart';
 import 'middleware/etag.dart';
@@ -49,6 +50,7 @@ class AppConfig {
     this.serverHeader = '',
     this.healthCheckPath,
     this.healthCheck,
+    this.metrics,
     this.poweredByHeader = false,
     this.requestTimeout,
     this.maxRequestBodyBytes,
@@ -173,6 +175,11 @@ class AppConfig {
 
   /// Optional readiness check for [healthCheckPath], e.g. a database ping.
   final Future<bool> Function()? healthCheck;
+
+  /// If non-null, request metrics are recorded in `GisilaApp.metrics` and
+  /// served in the Prometheus format at [MetricsConfig.path] (by default
+  /// only to direct loopback connections).
+  final MetricsConfig? metrics;
 
   /// Value of the `Server` header; empty (the default) sends none, so the
   /// framework and its version aren't advertised.

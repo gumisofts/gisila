@@ -36,6 +36,7 @@ import 'app.dart';
 import 'auth_failure.dart';
 import 'context.dart';
 import 'exceptions.dart';
+import 'metrics/metrics_middleware.dart' show kRouteTemplateKey;
 import 'middleware/body_limit.dart';
 import 'middleware/content_type.dart';
 import 'middleware/cors.dart';
@@ -129,6 +130,17 @@ Handler gisilaRoute({
   // 1. Per-route CORS overrides
   if (effective.cors != null) {
     current = corsMiddleware(effective.cors!)(current);
+  }
+
+  // 0. Name the route for the metrics (`GET /users/<id>` -> the path).
+  if (routeId != null) {
+    final space = routeId.indexOf(' ');
+    final template = space < 0 ? routeId : routeId.substring(space + 1);
+    final inner = current;
+    current = (Request request) {
+      RequestContext.maybeOf(request)?.extra[kRouteTemplateKey] = template;
+      return inner(request);
+    };
   }
 
   return current;

@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Metrics: `AppConfig.metrics` records `http_server_requests_total`,
+  `http_server_request_duration_seconds` and
+  `http_server_requests_in_flight` (labelled by route template, not raw
+  path) and serves them in the Prometheus format at `/metrics`, by
+  default only to direct loopback connections without forwarding
+  headers; `bearerToken` or `allow` open it up. `app.metrics` takes your
+  own counters, gauges and histograms. `MetricsHub` merges the numbers
+  of every isolate serving one port.
+- `start(shared: true)` lets several isolates serve one port.
 - `AppConfig.compression` (off by default): gzip for clients that accept
   it, for compressible MIME types (never SSE) of at least `minBytes`;
   streams are compressed as written; adds `Vary: Accept-Encoding`;
