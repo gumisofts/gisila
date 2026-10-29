@@ -16,7 +16,8 @@ mTLS).
 - [Default behaviour](#default-behaviour)
 - [`StaticTokenAuthenticator`](#statictokenauthenticator)
 - [`JwtAuthenticator` (built in)](#jwtauthenticator-built-in)
-- [Recipe: API key in header](#recipe-api-key-in-header)
+- [`ApiKeyAuthenticator` (built in)](#apikeyauthenticator-built-in)
+- [Combining authenticators](#combining-authenticators)
 - [Recipe: cookie session](#recipe-cookie-session)
 - [Recipe: mTLS / client certs](#recipe-mtls--client-certs)
 - [Recipe: database-backed permissions](#recipe-database-backed-permissions)
@@ -222,35 +223,55 @@ localhost).
 
 Implement `JwtKeySet` yourself to load keys from somewhere else.
 
-## Recipe: API key in header
+## `ApiKeyAuthenticator` (built in)
+
+Keys are stored hashed: the authenticator hashes the key it receives
+(SHA-256) and hands your `lookup` the hash, so the keys themselves never
+sit in your database.
 
 ```dart
-class ApiKeyAuthenticator extends Authenticator {
-  ApiKeyAuthenticator(this._lookup);
-  final Future<Principal?> Function(String key) _lookup;
+// Issuing a key: store the hash, show the key once.
+final key = ApiKeyAuthenticator.generate(prefix: 'sk_live_');
+await db.apiKeys.insert(hash: ApiKeyAuthenticator.hash(key), ownerId: user.id);
 
-  @override
-  Future<Principal?> authenticate(Request request) async {
-    final key = request.headers['x-api-key'];
-    if (key == null || key.isEmpty) return null;
-    return _lookup(key);
-  }
-}
-
+// Checking keys sent as `X-API-Key: <key>`.
 final app = GisilaApp(
   config: AppConfig(
-    authenticator: ApiKeyAuthenticator((key) async {
-      final row = await db.apiKeys.where((k) => k.hash.eq(_hash(key))).first;
-      if (row == null) return null;
-      return Principal(
-        id: row.ownerId,
-        permissions: row.scopes,
-        claims: {'apiKeyId': row.id},
-      );
-    }),
+    authenticator: ApiKeyAuthenticator(
+      lookup: (hash, request) async {
+        final row = await db.apiKeys.findActiveByHash(hash);
+        if (row == null) return null;            // -> 401 invalid_api_key
+        return Principal(
+          id: row.ownerId,
+          permissions: row.scopes,
+          claims: {'apiKeyId': row.id},
+        );
+      },
+    ),
   ),
 );
 ```
+
+`generate` gives 256 random bits after an optional prefix; a prefix
+makes leaked keys easy to spot (and to scan for). Use `header:` for
+another header name or `keyFromRequest:` to read it from elsewhere.
+
+## Combining authenticators
+
+`CompositeAuthenticator` tries each in turn and takes the first
+principal, e.g. JWTs from the browser app and API keys from scripts:
+
+```dart
+authenticator: CompositeAuthenticator([
+  JwtAuthenticator(key: key, algorithms: {'HS256'}),
+  ApiKeyAuthenticator(lookup: findKey),
+]),
+```
+
+If one throws (a credential is present but wrong), the search stops with
+that 401; a rejected token is never retried as something else. Give each
+credential its own header (`Authorization` for JWTs, `X-API-Key` for
+keys) so they don't collide.
 
 ## Recipe: cookie session
 

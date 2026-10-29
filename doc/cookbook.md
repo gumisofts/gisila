@@ -65,34 +65,20 @@ parameters, and DTOs. No magic, no shared base class required.
 
 ## API key + JWT side-by-side
 
-A composite authenticator tries each strategy in turn:
-
 ```dart
-class MultiAuthenticator extends Authenticator {
-  const MultiAuthenticator(this.strategies);
-  final List<Authenticator> strategies;
-
-  @override
-  Future<Principal?> authenticate(Request request) async {
-    for (final s in strategies) {
-      final p = await s.authenticate(request);
-      if (p != null) return p;
-    }
-    return null;
-  }
-}
-
 final app = GisilaApp(
   config: AppConfig(
-    authenticator: MultiAuthenticator([
+    authenticator: CompositeAuthenticator([
       JwtAuthenticator(key: JwtKey.hmac(env.jwtSecret), algorithms: {'HS256'}),
-      ApiKeyAuthenticator(db),
+      ApiKeyAuthenticator(lookup: (hash, _) => apiKeys.findActive(hash)),
     ]),
   ),
 );
 ```
 
-Throwing inside any one strategy short-circuits with a `401`.
+The first authenticator that finds a principal wins. One that throws (a
+bad token) stops the search with a `401`. See
+[authentication.md](authentication.md#combining-authenticators).
 
 ## Multi-tenant routing
 

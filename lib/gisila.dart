@@ -61,6 +61,7 @@ export 'src/annotations/params.dart';
 export 'src/annotations/permission.dart';
 export 'src/runtime/app.dart';
 export 'src/runtime/auth/authenticator.dart';
+export 'src/runtime/auth/api_key.dart';
 export 'src/runtime/auth/jwt.dart';
 export 'src/runtime/auth/permission_resolver.dart';
 export 'src/runtime/auth/principal.dart';
