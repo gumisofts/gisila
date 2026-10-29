@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- `app.serveStatic(prefix, directory)` serves files (controllers still
+  win; missing files fall through to the JSON 404) with weak ETags,
+  `Last-Modified`, `304`s, `maxAge` / `immutable` cache lifetimes, and an
+  optional single-page-app fallback to `index.html` for page routes.
+  Never serves outside the directory (traversal, encoded slashes,
+  symlinks out), directory listings or dotfiles. `staticFilesHandler` is
+  the handler on its own. New direct dependency: `path`.
+
 ## 0.4.0 — 2026-10-30 — JWT auth, test client, metrics, security headers
 
 Behaviour change: responses now carry security headers by default

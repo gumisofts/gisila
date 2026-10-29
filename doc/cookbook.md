@@ -12,6 +12,7 @@ lines on top of what `gisila` ships with.
 - [Idempotency keys](#idempotency-keys)
 - [File uploads](#file-uploads)
 - [Server-Sent Events](#server-sent-events)
+- [Static files and single-page apps](#static-files-and-single-page-apps)
 - [Health and readiness probes](#health-and-readiness-probes)
 - [Graceful shutdown](#graceful-shutdown)
 - [Scheduled background jobs](#scheduled-background-jobs)
@@ -252,6 +253,37 @@ Future<Response> stream(RequestContext ctx) async {
 
 Remember to close the stream when the request is cancelled - hook
 into `request.context['shelf.io.connection']?.onDone`.
+
+## Static files and single-page apps
+
+```dart
+// A built frontend at the root; the API's controllers still win.
+app.serveStatic('/', 'web/dist',
+    config: StaticFilesConfig(
+      spaFallback: true,                                  // /orders/42 -> index.html
+      maxAge: const Duration(hours: 1),
+      immutable: RegExp(r'^assets/.*\.[0-9a-f]{8,}\.'),   // hashed build output
+    ));
+
+// Or just a folder under a prefix.
+app.serveStatic('/uploads', 'storage/public');
+```
+
+* Controllers are matched first; a path with no file falls through to
+  the next mount and then the JSON 404.
+* `spaFallback` answers only `GET` requests for paths without a file
+  extension that accept `text/html`, so API calls and missing assets
+  still get a 404.
+* Caching: files carry a weak `ETag` and `Last-Modified` and answer
+  `304` to `If-None-Match` / `If-Modified-Since`. HTML is always
+  `no-cache` (revalidated, so a deploy shows up at once); other files get
+  `maxAge`, and names matching `immutable` a year.
+* Safety: nothing outside the directory is served (`..` and encoded
+  slashes are refused, symlinks leading out are treated as missing), no
+  directory listings, no dotfiles such as `.env` unless `allowDotfiles`.
+* Pages get the security headers too, including `X-Frame-Options: DENY`;
+  add a CSP for them with `SecurityHeadersConfig.htmlContentSecurityPolicy`.
+* Behind nginx or a CDN, let them serve the files instead when you can.
 
 ## Health and readiness probes
 

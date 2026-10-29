@@ -30,6 +30,7 @@ import 'middleware/request_logging.dart';
 import 'middleware/security_headers.dart';
 import 'middleware/timeout.dart';
 import 'service.dart';
+import 'static_files.dart';
 
 /// Signature each generated controller exposes via the
 /// `attachToApp(GisilaApp app, Router router, {String prefix})`
@@ -258,12 +259,31 @@ class GisilaApp {
     _controllers.add(_RegisteredController(attacher: attacher, prefix: prefix));
   }
 
+  /// Serves the files under [directory] at [prefix] (`'/'` for a whole
+  /// frontend, `'/assets'`, ...). Controllers registered anywhere win over
+  /// it, and paths it has no file for fall through to the next mount and
+  /// then the JSON 404. See [StaticFilesConfig] for caching and the
+  /// single-page-app fallback.
+  void serveStatic(String prefix, String directory,
+      {StaticFilesConfig config = const StaticFilesConfig()}) {
+    if (!prefix.startsWith('/')) {
+      throw ArgumentError.value(prefix, 'prefix', 'must start with "/"');
+    }
+    _staticMounts.add((prefix, staticFilesHandler(directory, config)));
+  }
+
+  final List<(String, Handler)> _staticMounts = <(String, Handler)>[];
+
   /// Builds the full Shelf handler: framework middleware + user
   /// middleware + router.
   Handler buildHandler() {
     final router = Router(notFoundHandler: _notFound);
     for (final c in _controllers) {
       c.attacher(this, router, prefix: c.prefix);
+    }
+    // After the controllers, so their routes are matched first.
+    for (final (prefix, handler) in _staticMounts) {
+      router.mount(prefix, handler);
     }
 
     var pipeline = const Pipeline();

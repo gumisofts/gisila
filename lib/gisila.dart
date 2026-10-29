@@ -94,6 +94,7 @@ export 'src/runtime/route_config.dart';
 export 'src/runtime/route_runtime.dart' show GisilaRouteHandler, gisilaRoute;
 // Service layer.
 export 'src/runtime/service.dart';
+export 'src/runtime/static_files.dart';
 // Content-type-aware body parsing.
 export 'src/runtime/parsers/body_parser.dart'
     show DecodedBody, readBody, readFormBody;
