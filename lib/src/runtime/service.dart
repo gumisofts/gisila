@@ -61,6 +61,9 @@ abstract class Service {
   /// Convenience: same as `ctx.db<T>()`.
   T db<T>() => ctx.db<T>();
 
+  /// Convenience: same as `ctx.singleton<T>()`.
+  T singleton<T extends Object>() => ctx.singleton<T>();
+
   /// Wires the service to [context]. Used by the framework; tests
   /// call this manually to exercise a service without a full
   /// request pipeline.

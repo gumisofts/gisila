@@ -1,5 +1,67 @@
 # Changelog
 
+## 0.4.0 — 2026-10-30 — JWT auth, test client, metrics, security headers
+
+Behaviour change: responses now carry security headers by default
+(`Strict-Transport-Security`, `X-Content-Type-Options`,
+`X-Frame-Options: DENY`, `Referrer-Policy`, and a CSP on non-HTML
+responses). Set `AppConfig(securityHeaders: null)` to keep the 0.3.0
+behaviour. Everything else is additive.
+
+- Metrics: `AppConfig.metrics` records `http_server_requests_total`,
+  `http_server_request_duration_seconds` and
+  `http_server_requests_in_flight` (labelled by route template, not raw
+  path) and serves them in the Prometheus format at `/metrics`, by
+  default only to direct loopback connections without forwarding
+  headers; `bearerToken` or `allow` open it up. `app.metrics` takes your
+  own counters, gauges and histograms. `MetricsHub` merges the numbers
+  of every isolate serving one port.
+- `start(shared: true)` lets several isolates serve one port.
+- `AppConfig.compression` (off by default): gzip for clients that accept
+  it, for compressible MIME types (never SSE) of at least `minBytes`;
+  streams are compressed as written; adds `Vary: Accept-Encoding`;
+  `shouldCompress` can veto (BREACH). `Content-Encoding: identity` on a
+  response opts it out.
+- `AppConfig.etags` (off by default): hashes `GET` / `HEAD` 200 bodies up
+  to `maxBytes` into an `ETag` and answers `If-None-Match` with `304`.
+  Handler ETags are kept; `no-store` responses are skipped; gzipped
+  responses carry the weak form of the tag. New dependency: `crypto`.
+- App-wide singletons: `registerSingleton(instance)` and
+  `registerSingletonFactory<T>((app) => ...)` (created in `start()`, may
+  be async), both with an optional `dispose`. Read them with
+  `app.singleton<T>()`, `ctx.singleton<T>()` or `Service.singleton<T>()`.
+- Lifecycle hooks: `onStart` (after singletons, before serving) and
+  `onStop` (after the server closes, reverse order, failures logged).
+  `init()` runs the start-up half without a server (tests, custom
+  servers); a failed start tears down what it set up. `stop()` disposes
+  singletons in reverse order, then the cache and database.
+- Security headers on by default (`AppConfig.securityHeaders`):
+  `Strict-Transport-Security` (180 days), `X-Content-Type-Options:
+  nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, and
+  `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'`
+  on non-HTML responses (HTML gets a CSP only from
+  `htmlContentSecurityPolicy`). Headers a handler sets are kept;
+  `securityHeaders: null` turns them off. Behaviour change: responses
+  that had none of these headers now have them.
+- `JwtAuthenticator`: verifies bearer JWTs and maps them to a `Principal`
+  (`sub`, `roles`, `scope` / `permissions` by default, or your own
+  `toPrincipal`, which can load the user and return `null` to reject).
+  Tokens must use an algorithm from `algorithms` that fits the key (no
+  `none`, no RSA public key as an HMAC secret) and carry an `exp`;
+  `exp` / `nbf` / `iat` allow `leeway` (30 s); `issuer`, `audience` (any
+  of), `maxAge` and `requiredType` are optional. Rejections are 401 with
+  code `token_expired` or `invalid_token`.
+- `JwtSigner` issues matching tokens. `JwtKey` covers HMAC (at least 32
+  bytes), RSA and EC PEM keys and JWKs; `StaticJwtKeySet` picks keys by
+  `kid` for rotation; `RemoteJwks` loads an identity provider's JWKS
+  with caching and early refresh on unknown `kid`. New dependency:
+  `dart_jsonwebtoken` (signatures only; claim checks are gisila's).
+- `package:gisila/testing.dart`: `GisilaTestClient` sends requests
+  through `app.buildHandler()` in memory (`get` / `post` / ... with
+  `json:`, `form:`, `query:`; `withToken`, `withHeaders`, and `as(principal)`
+  with the new `TestAuthenticator`). `TestResponse` exposes `jsonMap`,
+  `errorCode` and the rest of the error envelope.
+
 ## 0.3.0 — 2026-10-28 — pipeline hardening (BREAKING)
 
 - Security: code generation matched annotations by name and by any library

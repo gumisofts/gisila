@@ -3,8 +3,12 @@ description: >-
   A Shelf-based web framework with annotation-driven routing, declarative
   permission/role checks, pluggable middleware, configurable structured
   logging, and a small build_runner code generator.
-version: 0.3.0
+version: 0.4.0
 repository: https://github.com/gumisofts/gisila
+
+# Throwaway keys used only by the JWT tests.
+false_secrets:
+  - /test/fixtures/jwt_keys.dart
 
 environment:
   sdk: ^3.3.0
@@ -17,6 +21,10 @@ dependencies:
   # Body parsing: form-urlencoded + multipart/form-data on top of JSON.
   http_parser: ^4.0.2
   mime: ^1.0.4
+  # JWT signature verification and signing (JwtAuthenticator, JwtSigner).
+  dart_jsonwebtoken: ^3.4.1
+  # ETag hashing.
+  crypto: ^3.0.3
 
   # Build-time dependencies are kept in main deps for the same reason
   # gisila_doc keeps them here: the builder library is exported from

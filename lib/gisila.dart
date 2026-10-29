@@ -61,6 +61,7 @@ export 'src/annotations/params.dart';
 export 'src/annotations/permission.dart';
 export 'src/runtime/app.dart';
 export 'src/runtime/auth/authenticator.dart';
+export 'src/runtime/auth/jwt.dart';
 export 'src/runtime/auth/permission_resolver.dart';
 export 'src/runtime/auth/principal.dart';
 // Cache layer: pluggable backend (Redis, Memcached, in-memory, …).
@@ -79,9 +80,15 @@ export 'src/runtime/logging/log_event.dart';
 export 'src/runtime/logging/logger.dart';
 export 'src/runtime/middleware/body_limit.dart';
 export 'src/runtime/middleware/content_type.dart';
+export 'src/runtime/metrics/metrics.dart';
+export 'src/runtime/metrics/metrics_hub.dart';
+export 'src/runtime/metrics/metrics_middleware.dart';
+export 'src/runtime/middleware/compression.dart';
 export 'src/runtime/middleware/cors.dart';
+export 'src/runtime/middleware/etag.dart';
 export 'src/runtime/middleware/rate_limit.dart';
 export 'src/runtime/middleware/request_id.dart';
+export 'src/runtime/middleware/security_headers.dart';
 // Per-route configuration.
 export 'src/runtime/route_config.dart';
 export 'src/runtime/route_runtime.dart' show GisilaRouteHandler, gisilaRoute;

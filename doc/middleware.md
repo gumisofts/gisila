@@ -19,7 +19,7 @@ middleware, and the patterns for plugging your own in.
 - [Short-circuiting](#short-circuiting)
 - [Recipe: structured request tracing](#recipe-structured-request-tracing)
 - [Recipe: per-tenant rate limiting](#recipe-per-tenant-rate-limiting)
-- [Recipe: gzip compression](#recipe-gzip-compression)
+- [Compression and ETags](#compression-and-etags)
 - [Recipe: request body validator](#recipe-request-body-validator)
 - [Testing middleware](#testing-middleware)
 
@@ -29,20 +29,27 @@ middleware, and the patterns for plugging your own in.
 to inner; "outer" sees the request first and the response last):
 
 1. **App injection** - puts the `GisilaApp` on `request.context`.
-2. **Request id** - mints / echoes `X-Request-Id`.
-3. **Cache** *(if `AppConfig.cache != null`)*.
-4. **CORS** *(if `AppConfig.cors != null`)* - answers pre-flights.
-5. **Rate limit** *(if `AppConfig.rateLimit != null`)*.
-6. **Body size limit** *(if `maxRequestBodyBytes != null`)*.
-7. **Access log** *(if `logRequests`)*.
-8. **Error mapper** - turns `HttpException` into JSON envelopes,
-   forwards everything else through `AppConfig.errorHandler`.
-9. **DB session** *(if `AppConfig.database != null`)* - inside the layers
-   above, so pre-flights and rejected requests never take a connection.
-10. **Your global middleware** (in registration order).
-11. **Server headers** - `Server`, `X-Powered-By`.
-12. **Request timeout** *(if `requestTimeout != null`)*.
-13. **Router** → per-route pipeline (CORS override, rate limit, content
+2. **Security headers** *(unless `AppConfig.securityHeaders` is null)* -
+   outside everything else, so early answers carry them too.
+3. **Request id** - mints / echoes `X-Request-Id`.
+4. **Metrics** *(if `AppConfig.metrics != null`)* - serves the metrics
+   path and times everything inside it.
+5. **Compression** *(if `AppConfig.compression != null`)*.
+6. **ETags** *(if `AppConfig.etags != null`)* - inside compression, so
+   the tag names the plain body.
+7. **Cache** *(if `AppConfig.cache != null`)*.
+8. **CORS** *(if `AppConfig.cors != null`)* - answers pre-flights.
+9. **Rate limit** *(if `AppConfig.rateLimit != null`)*.
+10. **Body size limit** *(if `maxRequestBodyBytes != null`)*.
+11. **Access log** *(if `logRequests`)*.
+12. **Error mapper** - turns `HttpException` into JSON envelopes,
+    forwards everything else through `AppConfig.errorHandler`.
+13. **DB session** *(if `AppConfig.database != null`)* - inside the layers
+    above, so pre-flights and rejected requests never take a connection.
+14. **Your global middleware** (in registration order).
+15. **Server headers** - `Server`, `X-Powered-By`.
+16. **Request timeout** *(if `requestTimeout != null`)*.
+17. **Router** → per-route pipeline (CORS override, rate limit, content
     types, body cap, named middleware, route timeout, auth guard) →
     handler.
 
@@ -54,8 +61,12 @@ The error mapper sits **above** your handlers so any exception you
 | Middleware                       | Enabled when                                  | Configured via                                  |
 | -------------------------------- | --------------------------------------------- | ----------------------------------------------- |
 | Request-id propagation           | always                                        | `AppConfig.requestIdHeader`                     |
+| Security headers (HSTS, CSP, …)  | `AppConfig.securityHeaders != null` (default) | `SecurityHeadersConfig`                         |
 | Structured access log            | `AppConfig.logRequests` (default)             | `AppConfig.logger`                              |
 | CORS (incl. pre-flight)          | `AppConfig.cors != null`                      | `CorsConfig`                                    |
+| Prometheus metrics               | `AppConfig.metrics != null`                   | `MetricsConfig`                                 |
+| gzip compression                 | `AppConfig.compression != null`               | `CompressionConfig`                             |
+| ETag / 304 Not Modified          | `AppConfig.etags != null`                     | `EtagConfig`                                    |
 | Token-bucket rate limit          | `AppConfig.rateLimit != null`                 | `RateLimitConfig`                               |
 | Body size limit                  | `maxRequestBodyBytes != null`                 | `AppConfig.maxRequestBodyBytes`                 |
 | Request timeout                  | `requestTimeout != null`                      | `AppConfig.requestTimeout`                      |
@@ -320,33 +331,46 @@ Middleware redisRateLimit(RedisClient redis, {int rpm = 600}) {
 }
 ```
 
-## Recipe: gzip compression
+## Compression and ETags
 
-Use `package:shelf_gzip` or hand-roll a small wrapper:
+Both are built in and off by default:
 
 ```dart
-Middleware gzipMiddleware() {
-  return (Handler inner) {
-    return (Request request) async {
-      final accept = request.headers['accept-encoding'] ?? '';
-      final wantsGzip = accept.toLowerCase().contains('gzip');
-      final response = await inner(request);
-      if (!wantsGzip) return response;
-      final body = await response.read().toList();
-      final flat = Uint8List.fromList(body.expand((b) => b).toList());
-      final encoded = gzip.encode(flat);
-      return response.change(
-        body: encoded,
-        headers: {
-          ...response.headersAll.map((k, v) => MapEntry(k, v.join(','))),
-          'content-encoding': 'gzip',
-          'content-length': encoded.length.toString(),
-        },
-      );
-    };
-  };
-}
+AppConfig(
+  compression: const CompressionConfig(),   // gzip
+  etags: const EtagConfig(),                // ETag + 304 Not Modified
+);
 ```
+
+**Compression** gzips responses for clients that send
+`Accept-Encoding: gzip` when the MIME type is compressible (JSON, text,
+JavaScript, XML, SVG by default; never `text/event-stream`) and the body
+is at least `minBytes` (1 KiB). Streams of unknown length are compressed
+as they're written. It adds `Vary: Accept-Encoding` and leaves alone any
+response that already has a `Content-Encoding`, so a route can send
+`Content-Encoding: identity` to opt out. Leave it off when your reverse
+proxy compresses already.
+
+Compressing a page that holds a secret next to text the caller controls
+can leak the secret over TLS (the BREACH attack). Use `shouldCompress` to
+leave such responses out:
+
+```dart
+CompressionConfig(
+  shouldCompress: (request, response) => !request.url.path.startsWith('auth/'),
+)
+```
+
+**ETags** hash the body of successful `GET` / `HEAD` responses up to
+`maxBytes` (1 MiB) and answer `304 Not Modified` with no body when the
+request's `If-None-Match` matches. A handler's own `ETag` is kept and
+honoured, and `Cache-Control: no-store` responses are skipped. With
+compression on, a gzipped response carries the weak form `W/"..."` of
+the same tag, which still matches.
+
+The ETag still means the handler ran: it saves bandwidth, not work. To
+skip the work, set an `ETag` yourself from a version column and check
+`If-None-Match` before loading anything.
 
 ## Recipe: request body validator
 
