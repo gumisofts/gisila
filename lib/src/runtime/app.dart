@@ -559,6 +559,9 @@ class GisilaApp {
       return (Request request) async {
         try {
           return await inner(request);
+        } on HijackException {
+          // A WebSocket upgrade took the connection; there is no response.
+          rethrow;
         } on HttpException catch (e) {
           return Response(
             e.statusCode,

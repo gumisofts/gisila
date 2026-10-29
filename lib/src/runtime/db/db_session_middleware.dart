@@ -75,6 +75,10 @@ Middleware dbSessionMiddleware(DatabaseProvider<Object?> provider) {
       } on FormValidationException {
         ok = true;
         rethrow;
+      } on HijackException {
+        // Upgraded to a WebSocket: the handler finished its request work.
+        ok = true;
+        rethrow;
       } catch (_) {
         ok = false;
         rethrow;

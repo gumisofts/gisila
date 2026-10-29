@@ -1,7 +1,26 @@
 # Changelog
 
-## Unreleased
+## 0.4.1 — 2026-10-30 — static files, API keys, pagination, SSE and WebSockets
 
+0.4.0 was tagged but never published; this release includes it (see
+below) along with the following.
+
+- Server-sent events: `sseResponse(stream)` with `SseEvent` (multi-line
+  data, `event`, `id`, `retry`, comments, `SseEvent.json`), unbuffered
+  output, keep-alive comments and cancellation on disconnect;
+  `lastEventId(request)` for resuming.
+- WebSockets: upgrades via `shelf_web_socket` inside a guarded route now
+  work through the whole pipeline. The error mapper, access log, metrics
+  and DB session let shelf's `HijackException` through (it used to become
+  a logged 500); the upgrade is logged and counted as `101`.
+  `HijackException` is exported.
+- Fix: `logResponseBody` no longer reads bodies of unknown length (event
+  streams, streamed files), which hung such responses.
+- Pagination helpers: `PageParams` (validated, clamped `limit` /
+  `offset` / `cursor`; bad values are 400s), `Cursor.encode` / `decode`
+  for keyset pagination (malformed cursors are 400 `invalid_cursor`),
+  and `Page<T>`, which renders `{"items": [...], "page": {...}}` with
+  `has_more`.
 - `ApiKeyAuthenticator`: keys in `X-API-Key` (or `header:` /
   `keyFromRequest:`), looked up by SHA-256 hash so only hashes are
   stored; unknown keys are 401 `invalid_api_key`. `generate(prefix:)`

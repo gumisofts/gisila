@@ -12,6 +12,7 @@ lines on top of what `gisila` ships with.
 - [Idempotency keys](#idempotency-keys)
 - [File uploads](#file-uploads)
 - [Server-Sent Events](#server-sent-events)
+- [WebSockets](#websockets)
 - [Static files and single-page apps](#static-files-and-single-page-apps)
 - [Health and readiness probes](#health-and-readiness-probes)
 - [Graceful shutdown](#graceful-shutdown)
@@ -22,33 +23,44 @@ lines on top of what `gisila` ships with.
 
 ## Pagination helpers
 
-Centralise the query-parsing logic:
+Declare the query parameters on the handler (so they're bound and show up
+in the API docs), then let `PageParams` validate them and `Page` shape
+the response:
 
 ```dart
-class PageQuery {
-  PageQuery(this.limit, this.offset);
-
-  factory PageQuery.fromQuery(int? limit, int? offset) =>
-      PageQuery((limit ?? 25).clamp(1, 100), (offset ?? 0).clamp(0, 100000));
-
-  final int limit;
-  final int offset;
-}
-
 @Get('/')
 @Permissions({'posts:read'})
-Future<Map<String, Object?>> list({int? limit, int? offset}) async {
-  final q = PageQuery.fromQuery(limit, offset);
-  final rows = await repo.posts.where(...).limit(q.limit).offset(q.offset).get();
-  final total = await repo.posts.where(...).count();
-  return {
-    'items': rows,
-    'limit': q.limit,
-    'offset': q.offset,
-    'total': total,
-  };
+Future<Page<Post>> list({int? limit, int? offset}) async {
+  final page = PageParams(limit: limit, offset: offset); // 25 by default, 100 at most
+  final rows = await posts.list(limit: page.limit, offset: page.offset);
+  return Page(rows, params: page, total: await posts.count());
 }
 ```
+
+```json
+{"items": [...], "page": {"limit": 25, "offset": 50, "total": 240, "has_more": true}}
+```
+
+For large or fast-changing tables, page by cursor (keyset pagination)
+instead of offset:
+
+```dart
+@Get('/feed')
+Future<Page<Post>> feed({int? limit, String? cursor}) async {
+  final page = PageParams(limit: limit, cursor: cursor);
+  final after = cursor == null ? null : Cursor.decode(cursor); // 400 if malformed
+  final rows = await posts.after(id: after?['id'] as int?, limit: page.limit + 1);
+  final more = rows.length > page.limit;
+  final items = rows.take(page.limit).toList();
+  return Page(items,
+      params: page,
+      nextCursor: more ? Cursor.encode({'id': items.last.id}) : null);
+}
+```
+
+A `limit` above the maximum is cut down; a negative offset or zero limit
+is a `400`. Cursors are opaque to clients but not signed, so decode them
+only into values you'd accept from the client anyway.
 
 ## Versioned APIs
 
@@ -221,24 +233,53 @@ Future<Response> putBlob(String id, Request request) async {
 ## Server-Sent Events
 
 ```dart
-@Get('/events')
+@Get('/orders/{id}/events')
 @RequireAuth()
-Future<Response> stream(RequestContext ctx) async {
-  final controller = StreamController<List<int>>();
-  Timer.periodic(const Duration(seconds: 1), (t) {
-    if (controller.isClosed) return t.cancel();
-    controller.add(utf8.encode('data: ${DateTime.now().toIso8601String()}\n\n'));
-  });
-  return Response.ok(controller.stream, headers: {
-    'content-type': 'text/event-stream',
-    'cache-control': 'no-cache',
-    'connection': 'keep-alive',
-  });
+Future<Response> events(String id, RequestContext ctx, OrderService orders) async {
+  final since = lastEventId(ctx.request);          // resume after a reconnect
+  return sseResponse(
+    orders.updates(id, since: since)
+        .map((o) => SseEvent.json(o, event: 'order', id: '${o.version}')),
+  );
 }
 ```
 
-Remember to close the stream when the request is cancelled - hook
-into `request.context['shelf.io.connection']?.onDone`.
+`sseResponse` sets `text/event-stream`, turns off output buffering (so
+each event goes out at once, also through nginx via
+`X-Accel-Buffering: no`) and sends a keep-alive comment every 15 seconds.
+When the browser disconnects, the subscription to your stream is
+cancelled: release resources in its `onCancel`. The route's guards run
+as usual; compression and ETags leave event streams alone.
+
+Browsers' `EventSource` can't send an `Authorization` header. Use a
+cookie, or a short-lived token in the query string read with
+`JwtAuthenticator(tokenFromRequest: ...)`.
+
+## WebSockets
+
+Upgrade inside a normal route with `package:shelf_web_socket`, so the
+route's guards decide who may connect:
+
+```dart
+import 'package:shelf_web_socket/shelf_web_socket.dart';
+
+@Get('/ws')
+@RequireAuth()
+Future<Response> socket(RequestContext ctx) async =>
+    webSocketHandler(
+      (channel, protocol) {
+        final user = ctx.principal!.id;
+        channel.stream.listen((message) => channel.sink.add('$user: $message'));
+      },
+      allowedOrigins: ['https://app.example.com'],
+    )(ctx.request);
+```
+
+Always pass `allowedOrigins`: browsers don't apply CORS to WebSockets,
+so without it any site can open a socket with your users' cookies.
+The upgrade shows as status `101` in the access log and metrics. A
+per-request database session is committed when the upgrade happens, so
+open your own connections inside the socket handler.
 
 ## Static files and single-page apps
 

@@ -3,7 +3,7 @@ description: >-
   A Shelf-based web framework with annotation-driven routing, declarative
   permission/role checks, pluggable middleware, configurable structured
   logging, and a small build_runner code generator.
-version: 0.4.0
+version: 0.4.1
 repository: https://github.com/gumisofts/gisila
 
 # Throwaway keys used only by the JWT tests.
@@ -40,3 +40,6 @@ dev_dependencies:
   test: ^1.24.0
   build_runner: ">=2.5.0 <3.0.0"
   build_test: ">=2.2.0 <4.0.0"
+  # WebSocket upgrade tests only.
+  shelf_web_socket: ">=2.0.0 <4.0.0"
+  web_socket_channel: ">=2.4.0 <4.0.0"
