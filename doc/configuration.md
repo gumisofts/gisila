@@ -36,6 +36,8 @@ know.
 | `requestIdHeader`      | `String`                  | `'X-Request-Id'`                   | Header used by the request-id middleware. |
 | `cors`                 | `CorsConfig?`             | `null`                             | Enables CORS middleware when non-null. |
 | `securityHeaders`      | `SecurityHeadersConfig?`  | `SecurityHeadersConfig()`          | HSTS, nosniff, framing, referrer and CSP headers; `null` sends none. |
+| `compression`          | `CompressionConfig?`      | `null`                             | gzips compressible responses ([middleware.md](middleware.md#compression-and-etags)). |
+| `etags`                | `EtagConfig?`             | `null`                             | ETags and `304 Not Modified` on `GET` responses. |
 | `rateLimit`            | `RateLimitConfig?`        | `null`                             | Enables the token-bucket rate limiter. |
 | `requestTimeout`       | `Duration?`               | `null`                             | Aborts requests after this duration (504). |
 | `maxRequestBodyBytes`  | `int?`                    | `null`                             | 413 when request body exceeds this. |
@@ -294,6 +296,9 @@ AppConfig(
 ```
 
 ### Production API
+
+Turn on `compression` here unless the reverse proxy compresses, and
+`etags` for clients that re-fetch the same resources.
 
 ```dart
 AppConfig(

@@ -18,7 +18,9 @@ import 'forms/form.dart' show FormValidationException;
 import 'logging/log_event.dart';
 import 'logging/logger.dart';
 import 'middleware/body_limit.dart';
+import 'middleware/compression.dart';
 import 'middleware/cors.dart';
+import 'middleware/etag.dart';
 import 'middleware/rate_limit.dart';
 import 'middleware/request_id.dart';
 import 'middleware/request_logging.dart';
@@ -301,6 +303,16 @@ class GisilaApp {
         return inner(request);
       };
     });
+
+    // Compression outside the ETags, so the hash names the plain body
+    // and a gzipped copy carries the same (weakened) tag.
+    if (config.compression != null) {
+      pipeline =
+          pipeline.addMiddleware(compressionMiddleware(config.compression!));
+    }
+    if (config.etags != null) {
+      pipeline = pipeline.addMiddleware(etagMiddleware(config.etags!));
+    }
 
     if (config.cache != null) {
       pipeline = pipeline.addMiddleware(cacheMiddleware(config.cache!));

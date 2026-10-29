@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- `AppConfig.compression` (off by default): gzip for clients that accept
+  it, for compressible MIME types (never SSE) of at least `minBytes`;
+  streams are compressed as written; adds `Vary: Accept-Encoding`;
+  `shouldCompress` can veto (BREACH). `Content-Encoding: identity` on a
+  response opts it out.
+- `AppConfig.etags` (off by default): hashes `GET` / `HEAD` 200 bodies up
+  to `maxBytes` into an `ETag` and answers `If-None-Match` with `304`.
+  Handler ETags are kept; `no-store` responses are skipped; gzipped
+  responses carry the weak form of the tag. New dependency: `crypto`.
 - App-wide singletons: `registerSingleton(instance)` and
   `registerSingletonFactory<T>((app) => ...)` (created in `start()`, may
   be async), both with an optional `dispose`. Read them with

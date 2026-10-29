@@ -19,6 +19,8 @@ dependencies:
   mime: ^1.0.4
   # JWT signature verification and signing (JwtAuthenticator, JwtSigner).
   dart_jsonwebtoken: ^3.4.1
+  # ETag hashing.
+  crypto: ^3.0.3
 
   # Build-time dependencies are kept in main deps for the same reason
   # gisila_doc keeps them here: the builder library is exported from

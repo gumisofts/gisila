@@ -11,7 +11,9 @@ import 'db/db_error_mapper.dart';
 import 'exceptions.dart';
 import 'logging/log_event.dart';
 import 'logging/logger.dart';
+import 'middleware/compression.dart';
 import 'middleware/cors.dart';
+import 'middleware/etag.dart';
 import 'middleware/rate_limit.dart';
 import 'middleware/security_headers.dart';
 import 'route_config.dart';
@@ -37,6 +39,8 @@ class AppConfig {
     this.requestIdHeader = 'X-Request-Id',
     this.cors,
     this.securityHeaders = const SecurityHeadersConfig(),
+    this.compression,
+    this.etags,
     this.rateLimit,
     this.rateLimitStore,
     this.trustedProxies = const <String>{'127.0.0.1', '::1'},
@@ -119,6 +123,15 @@ class AppConfig {
   /// responses). On by default; `null` turns them all off, and each field
   /// of [SecurityHeadersConfig] can be turned off on its own.
   final SecurityHeadersConfig? securityHeaders;
+
+  /// If non-null, responses are gzipped for clients that accept it (see
+  /// [compressionMiddleware]). Leave it off when a reverse proxy already
+  /// compresses.
+  final CompressionConfig? compression;
+
+  /// If non-null, successful `GET` responses get an `ETag` and repeat
+  /// requests with a matching `If-None-Match` get `304 Not Modified`.
+  final EtagConfig? etags;
 
   /// If non-null, the rate-limit middleware is registered with this
   /// config.
