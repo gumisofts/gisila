@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.4.1 — 2026-10-30 — static files, API keys, pagination, SSE and WebSockets
+
+0.4.0 was tagged but never published; this release includes it (see
+below) along with the following.
 
 - Server-sent events: `sseResponse(stream)` with `SseEvent` (multi-line
   data, `event`, `id`, `retry`, comments, `SseEvent.json`), unbuffered
