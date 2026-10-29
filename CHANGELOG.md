@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- App-wide singletons: `registerSingleton(instance)` and
+  `registerSingletonFactory<T>((app) => ...)` (created in `start()`, may
+  be async), both with an optional `dispose`. Read them with
+  `app.singleton<T>()`, `ctx.singleton<T>()` or `Service.singleton<T>()`.
+- Lifecycle hooks: `onStart` (after singletons, before serving) and
+  `onStop` (after the server closes, reverse order, failures logged).
+  `init()` runs the start-up half without a server (tests, custom
+  servers); a failed start tears down what it set up. `stop()` disposes
+  singletons in reverse order, then the cache and database.
 - Security headers on by default (`AppConfig.securityHeaders`):
   `Strict-Transport-Security` (180 days), `X-Content-Type-Options:
   nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, and

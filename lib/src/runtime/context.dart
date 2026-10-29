@@ -143,6 +143,20 @@ class RequestContext {
     return (resolver as Object Function(RequestContext, Type))(this, T) as T;
   }
 
+  /// The app-wide singleton registered as [T] (see
+  /// `GisilaApp.registerSingleton`). Throws [StateError] if none is
+  /// registered or the app hasn't started.
+  T singleton<T extends Object>() {
+    final resolver = extra[kSingletonResolverKey];
+    if (resolver == null) {
+      throw StateError(
+        'No singleton resolver attached to this request. Make sure the '
+        'request flows through GisilaApp.buildHandler().',
+      );
+    }
+    return (resolver as Object Function(Type))(T) as T;
+  }
+
   /// Reads the [RequestContext] previously attached to [request], or
   /// `null` if none.
   static RequestContext? maybeOf(Request request) {
@@ -154,6 +168,10 @@ class RequestContext {
 /// `RequestContext.extra` key under which [GisilaApp] stashes the
 /// service resolver function.
 const String kServiceResolverKey = 'gisila.service_resolver';
+
+/// `RequestContext.extra` key under which [GisilaApp] stashes the
+/// singleton resolver function.
+const String kSingletonResolverKey = 'gisila.singleton_resolver';
 
 /// `RequestContext.extra` key holding the request's [CancellationToken].
 const String kCancellationKey = 'gisila.cancellation';

@@ -232,6 +232,32 @@ app.registerService<UserService>(UserService.new);
 A fresh service is materialised per request; the framework injects
 `RequestContext` (and therefore `db`) before any service method runs.
 
+### Singletons and lifecycle hooks
+
+Things that live as long as the app (a Redis client, a mailer) are
+registered once and shared by every request:
+
+```dart
+app.registerSingleton(Mailer(smtpUrl));
+app.registerSingletonFactory<Redis>(
+  (app) => Redis.connect(redisUrl),        // runs in start(), may be async
+  dispose: (redis) => redis.close(),       // runs in stop()
+);
+app.onStart(() => warmCaches());
+app.onStop(() => flushMetrics());
+
+// Anywhere with a context:
+final redis = ctx.singleton<Redis>();     // or singleton<Redis>() in a Service
+```
+
+`start()` creates factory singletons in registration order (a factory
+can read earlier ones with `app.singleton<T>()`), then runs the
+`onStart` hooks. If one fails, what was set up is torn down and
+`start()` throws. `stop()` runs the `onStop` hooks and disposes the
+singletons in reverse order. When you serve through `buildHandler()`
+yourself (tests), call `await app.init()` first and `await app.stop()`
+after.
+
 ### Database
 
 Implement `DatabaseProvider<S>` for your driver (a `gisila_orm`

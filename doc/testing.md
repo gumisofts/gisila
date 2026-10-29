@@ -85,6 +85,9 @@ void main() {
   `errorMessage` from the error envelope. `toString()` shows the body, so
   failed `expect`s are readable.
 * `GisilaTestClient.handler(handler)` wraps any Shelf handler.
+* The client doesn't call `start()`. If the app has singleton factories
+  or `onStart` hooks, `await app.init()` in `setUp` and
+  `await app.stop()` in `tearDown`.
 
 To test the real JWT path end to end, sign a token with the app's key:
 

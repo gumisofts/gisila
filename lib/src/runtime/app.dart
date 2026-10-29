@@ -67,6 +67,18 @@ class GisilaApp {
   /// in any order.
   final List<_RegisteredController> _controllers = <_RegisteredController>[];
 
+  /// Singletons in registration order; [_Singleton.instance] is filled
+  /// in by [init] for those registered with a factory.
+  final Map<Type, _Singleton> _singletons = <Type, _Singleton>{};
+
+  final List<FutureOr<void> Function()> _onStart =
+      <FutureOr<void> Function()>[];
+  final List<FutureOr<void> Function()> _onStop =
+      <FutureOr<void> Function()>[];
+
+  /// Set while [init] runs or once it finished, until [stop].
+  Future<void>? _initialized;
+
   HttpServer? _server;
 
   /// Adds middleware to the global pipeline. Middleware added earlier
@@ -101,6 +113,121 @@ class GisilaApp {
   /// [RequestContext] before the service is handed to a controller.
   void registerService<S extends Service>(ServiceFactory<S> factory) {
     _serviceFactories[S] = factory;
+  }
+
+  /// Registers one app-wide [instance] of [T], shared by every request
+  /// (a Redis client, a mailer, an HTTP client). Read it with
+  /// [singleton], `ctx.singleton<T>()` or `Service.singleton<T>()`.
+  ///
+  /// [dispose] runs on [stop], in reverse registration order.
+  void registerSingleton<T extends Object>(T instance,
+      {FutureOr<void> Function(T instance)? dispose}) {
+    _addSingleton<T>(_Singleton(
+        instance: instance,
+        dispose: dispose == null ? null : (o) => dispose(o as T)));
+  }
+
+  /// Like [registerSingleton], but [create] runs during [init] (called by
+  /// [start]), so it can be async (open a connection) and read
+  /// singletons registered before it with `app.singleton<...>()`.
+  void registerSingletonFactory<T extends Object>(
+      FutureOr<T> Function(GisilaApp app) create,
+      {FutureOr<void> Function(T instance)? dispose}) {
+    _addSingleton<T>(_Singleton(
+        create: create,
+        dispose: dispose == null ? null : (o) => dispose(o as T)));
+  }
+
+  void _addSingleton<T>(_Singleton s) {
+    if (_initialized != null) {
+      throw StateError('Register singletons before start() / init().');
+    }
+    if (_singletons.containsKey(T)) {
+      throw StateError('A singleton for $T is already registered.');
+    }
+    _singletons[T] = s;
+  }
+
+  /// The singleton registered as [T]. Throws [StateError] when none is
+  /// registered, or when it comes from a factory that hasn't run yet.
+  T singleton<T extends Object>() => _singletonResolver(T) as T;
+
+  Object _singletonResolver(Type type) {
+    final s = _singletons[type];
+    if (s == null) {
+      throw StateError('No singleton registered for $type. '
+          'Call app.registerSingleton<$type>(...) before start().');
+    }
+    final instance = s.instance;
+    if (instance == null) {
+      throw StateError('The $type singleton is created by init() / start(), '
+          'which has not run yet.');
+    }
+    return instance;
+  }
+
+  /// Runs [hook] during [init] (called by [start]), after the singleton
+  /// factories, before the server accepts connections. Hooks run in
+  /// registration order; one that throws aborts the start.
+  void onStart(FutureOr<void> Function() hook) => _onStart.add(hook);
+
+  /// Runs [hook] during [stop], after the server closed and before the
+  /// singletons are disposed. Hooks run in reverse registration order;
+  /// one that throws is logged and the rest still run.
+  void onStop(FutureOr<void> Function() hook) => _onStop.add(hook);
+
+  /// Connects the cache, creates factory singletons and runs [onStart]
+  /// hooks. [start] calls it; call it yourself when serving through
+  /// [buildHandler] (tests, a custom server). Runs once; later calls wait
+  /// for the first. When a step fails, what was already set up is torn
+  /// down again and the error is rethrown.
+  Future<void> init() => _initialized ??= _init();
+
+  Future<void> _init() async {
+    try {
+      await config.cache?.connect();
+      for (final entry in _singletons.entries) {
+        final s = entry.value;
+        if (s.create != null) s.instance = await s.create!(this);
+      }
+      for (final hook in _onStart) {
+        await hook();
+      }
+    } catch (_) {
+      await _shutdown(runStopHooks: false);
+      _initialized = null;
+      rethrow;
+    }
+  }
+
+  /// Disposes singletons (reverse order), then the cache and database.
+  Future<void> _shutdown({required bool runStopHooks}) async {
+    Future<void> guarded(String what, FutureOr<void> Function() f) async {
+      try {
+        await f();
+      } catch (e, st) {
+        config.logger.error('gisila: $what failed during shutdown',
+            error: e, stackTrace: st);
+      }
+    }
+
+    if (runStopHooks) {
+      for (final hook in _onStop.reversed) {
+        await guarded('onStop hook', hook);
+      }
+    }
+    for (final entry in _singletons.entries.toList().reversed) {
+      final s = entry.value;
+      final instance = s.instance;
+      if (instance == null) continue;
+      if (s.dispose != null) {
+        await guarded('disposing ${entry.key}', () => s.dispose!(instance));
+      }
+      if (s.create != null) s.instance = null;
+    }
+    await guarded('cache disconnect', () async => config.cache?.disconnect());
+    await guarded(
+        'database dispose', () async => config.database?.dispose());
   }
 
   /// Returns the registered factory for service type [type], or
@@ -139,6 +266,7 @@ class GisilaApp {
         };
         if (ctx != null) {
           ctx.extra[kServiceResolverKey] = _serviceResolver;
+          ctx.extra[kSingletonResolverKey] = _singletonResolver;
           extras[kContextKey] = ctx;
         }
         final req = request.change(context: extras);
@@ -168,6 +296,7 @@ class GisilaApp {
         final ctx = RequestContext.maybeOf(request);
         if (ctx != null) {
           ctx.extra[kServiceResolverKey] = _serviceResolver;
+          ctx.extra[kSingletonResolverKey] = _singletonResolver;
         }
         return inner(request);
       };
@@ -258,7 +387,7 @@ class GisilaApp {
     bool stopOnSignals = false,
     Duration drainTimeout = const Duration(seconds: 30),
   }) async {
-    await config.cache?.connect();
+    await init();
     final h = buildHandler();
     _server = await shelf_io.serve(
       h,
@@ -290,14 +419,23 @@ class GisilaApp {
 
   /// Stops accepting connections and waits up to [drainTimeout] for
   /// in-flight requests before closing the rest; [force] closes at once.
-  /// Then releases the cache and the database provider.
+  /// Then runs the [onStop] hooks, disposes the singletons and releases
+  /// the cache and the database provider. Also tears down an app that was
+  /// only [init]ed.
   Future<void> stop({
     bool force = false,
     Duration drainTimeout = const Duration(seconds: 30),
   }) async {
     final server = _server;
-    if (server == null) return;
+    final initialized = _initialized;
+    if (server == null && initialized == null) return;
     _server = null;
+    _initialized = null;
+    if (server == null) {
+      await initialized!.catchError((_) {});
+      await _shutdown(runStopHooks: true);
+      return;
+    }
     for (final sub in _signalSubs) {
       await sub.cancel();
     }
@@ -316,8 +454,7 @@ class GisilaApp {
         await server.close(force: true);
       }
     }
-    await config.cache?.disconnect();
-    await config.database?.dispose();
+    await _shutdown(runStopHooks: true);
   }
 
   List<StreamSubscription<ProcessSignal>> _signalSubs = const [];
@@ -442,6 +579,14 @@ class GisilaApp {
       };
     };
   }
+}
+
+class _Singleton {
+  _Singleton({this.instance, this.create, this.dispose});
+
+  Object? instance;
+  final FutureOr<Object> Function(GisilaApp app)? create;
+  final FutureOr<void> Function(Object instance)? dispose;
 }
 
 class _RegisteredController {
